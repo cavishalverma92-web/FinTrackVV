@@ -58,7 +58,7 @@ export default function DailyBrief({
         </div>
 
         <div className="mb-6">
-          <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-4">
+          <h3 className="text-[10px] font-black text-[var(--text-dim)] uppercase tracking-widest font-mono mb-4">
             Key Developments
           </h3>
           {newsItems.slice(0, 6).map((item, i) => (
@@ -68,13 +68,20 @@ export default function DailyBrief({
                 i < Math.min(newsItems.length, 6) - 1 ? "border-b border-[var(--border-subtle)]" : ""
               }`}
             >
-              <span className="text-xs font-bold text-[var(--accent-green)] font-mono flex-shrink-0 mt-0.5 w-5">
+              <span className="text-[10px] font-black text-[var(--accent-green)] font-mono flex-shrink-0 mt-1 w-5 tabular-nums">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <div>
-                <p className="text-xs font-semibold text-[var(--text-primary)] leading-snug">
-                  {item.headline}
-                </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-2 flex-wrap">
+                  <p className="text-xs font-semibold text-[var(--text-primary)] leading-snug flex-1">
+                    {item.headline}
+                  </p>
+                  {item.risk === "High" && (
+                    <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black bg-[rgba(217,74,93,0.12)] text-[var(--accent-red)] font-mono uppercase">
+                      High Risk
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-[var(--text-dim)] mt-1 leading-relaxed">
                   {item.tldr}
                 </p>
@@ -93,21 +100,26 @@ export default function DailyBrief({
         />
 
         <div className="mb-6">
-          <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-3">
-            Credit Rating Changes
+          <h3 className="text-[10px] font-black text-[var(--text-dim)] uppercase tracking-widest font-mono mb-3">
+            Credit Rating Actions
           </h3>
           <div className="space-y-2">
             {ratingChanges.slice(0, 4).map((r, i) => (
-              <div key={i} className="flex items-center gap-3 text-xs">
-                <span className={`font-bold ${r.direction === "up" ? "text-[var(--accent-green)]" : "text-[var(--accent-red)]"}`}>
-                  {r.direction === "up" ? "Up" : "Down"}
+              <div key={i} className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-primary)] flex-wrap">
+                <span
+                  className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-mono"
+                  style={{
+                    color: r.direction === "up" ? "var(--accent-green)" : "var(--accent-red)",
+                    backgroundColor: r.direction === "up" ? "rgba(29,111,214,0.12)" : "rgba(217,74,93,0.12)",
+                  }}
+                >
+                  {r.direction === "up" ? "↑ Upgrade" : "↓ Downgrade"}
                 </span>
-                <span className="text-[var(--text-primary)] font-medium">{r.entity}:</span>
-                <span className="text-[var(--text-dim)] font-mono">
-                  {r.from} {"->"} {r.to}
+                <span className="text-xs font-semibold text-[var(--text-primary)]">{r.entity}</span>
+                <span className="text-[11px] text-[var(--text-dim)] font-mono">
+                  {r.from} → {r.to}
                 </span>
-                <span className="text-[var(--text-dim)]">({r.outlook})</span>
-                <span className="text-[var(--text-dim)]">- {r.agency}</span>
+                <span className="text-[10px] text-[var(--text-dim)] ml-auto font-mono">{r.agency}</span>
               </div>
             ))}
           </div>
@@ -146,7 +158,7 @@ function SignalList({ title, icon: Icon, color, bg, items, empty }) {
       <ul className="space-y-2">
         {list.map((item, index) => (
           <li key={index} className="text-xs text-[var(--text-primary)] leading-relaxed flex gap-2">
-            <span className="flex-shrink-0" style={{ color }}>*</span>
+            <span className="flex-shrink-0 mt-0.5" style={{ color }}>·</span>
             {item}
           </li>
         ))}

@@ -32,10 +32,34 @@ function getCategoryColor(category) {
     Fundraise: "var(--accent-blue)",
     Partnership: "var(--accent-blue)",
     "Risk Signal": "var(--accent-red)",
-    Policy: "var(--accent-amber)",
+    Policy: "#8B6FBF",
     "AI & Tech": "var(--accent-blue)",
   };
   return colors[category] || "var(--text-secondary)";
+}
+
+function getCategoryClass(category) {
+  const map = {
+    Regulation: "cat-regulation",
+    "Credit Rating": "cat-rating",
+    Fundraise: "cat-fundraise",
+    Partnership: "cat-partnership",
+    "Risk Signal": "cat-risk",
+    Policy: "cat-policy",
+    "AI & Tech": "cat-ai",
+  };
+  return map[category] || "";
+}
+
+function getImpactColor(level) {
+  if (level === "Critical") return "var(--accent-red)";
+  if (level === "High") return "var(--accent-amber)";
+  if (level === "Medium") return "var(--accent-blue)";
+  return "var(--text-dim)";
+}
+
+function isNew(publishedTs) {
+  return publishedTs && Date.now() - publishedTs < 2 * 60 * 60 * 1000;
 }
 
 function formatUpdatedAt(value) {
@@ -283,19 +307,24 @@ export default function NewsFeed({
             key={item.id}
             onClick={() => onSelectNews(item)}
             className={`
-              p-4 rounded-xl cursor-pointer transition-all border
+              p-4 rounded-xl cursor-pointer transition-all border card-shadow
               animate-fade-in stagger-${Math.min(index + 1, 8)}
+              ${getCategoryClass(item.category)}
               ${selectedId === item.id
                 ? "bg-[rgba(29,111,214,0.06)] border-[rgba(29,111,214,0.25)]"
                 : "bg-[var(--bg-card)] border-[var(--border-subtle)] card-hover"
               }
             `}
           >
-            <div className="flex items-center gap-2 mb-2">
+            {/* Row 1 — meta */}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <Tag label={item.source} color="var(--accent-blue)" />
               <Tag label={item.category} color={getCategoryColor(item.category)} />
-              {item.trending && (
-                <Flame size={12} className="text-[var(--accent-amber)]" />
+              {item.trending && <Flame size={12} className="text-[var(--accent-amber)]" />}
+              {isNew(item.publishedTs) && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[var(--accent-red)] text-white uppercase tracking-wider font-mono">
+                  NEW
+                </span>
               )}
               <div className="ml-auto flex items-center gap-1 text-[10px] text-[var(--text-dim)] font-mono">
                 <Clock size={10} />
@@ -303,34 +332,41 @@ export default function NewsFeed({
               </div>
             </div>
 
+            {/* Row 2 — headline */}
             <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug mb-2">
               {item.headline}
             </h3>
 
-            <p className="text-[11px] text-[var(--text-dim)] leading-relaxed line-clamp-2">
+            {/* Row 3 — tldr */}
+            <p className="text-[11px] text-[var(--text-dim)] leading-relaxed line-clamp-2 mb-3">
               {item.tldr}
             </p>
 
-            <div className="flex items-center gap-3 mt-3 flex-wrap">
+            {/* Row 4 — impact + link */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-3">
+                {["impactNBFC", "impactDigital", "impactInvestor"].map((key, i) => {
+                  const labels = ["NBFC", "Digital", "Investor"];
+                  const val = item[key];
+                  if (!val || val === "Low") return null;
+                  return (
+                    <span key={key} className="text-[10px] font-mono">
+                      <span className="text-[var(--text-dim)]">{labels[i]}: </span>
+                      <span className="font-bold" style={{ color: getImpactColor(val) }}>{val}</span>
+                    </span>
+                  );
+                })}
+              </div>
               {item.url && (
                 <a
                   href={item.url}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={(event) => event.stopPropagation()}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[var(--accent-blue)] hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-blue)] hover:underline"
                 >
-                  Read full article
-                  <ExternalLink size={11} />
+                  Read <ExternalLink size={10} />
                 </a>
-              )}
-              {typeof item.score === "number" && (
-                <span className="text-[10px] text-[var(--text-dim)] font-mono">
-                  Relevance {item.score}
-                </span>
-              )}
-              {item.risk === "High" && (
-                <Tag label="High Risk" color="var(--accent-red)" />
               )}
             </div>
           </article>

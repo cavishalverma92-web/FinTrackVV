@@ -49,37 +49,38 @@ export default function GlobalIntel({ globalData = [] }) {
               onClick={() => setExpandedIndex(isExpanded ? null : index)}
               className={`
                 p-5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]
-                cursor-pointer card-hover animate-fade-in stagger-${index + 1}
+                cursor-pointer card-hover card-shadow animate-fade-in stagger-${index + 1}
               `}
+              style={{ borderTopColor: sStyle.color, borderTopWidth: "2px" }}
             >
-              {/* Indicator name */}
-              <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-3">
-                {item.indicator}
-              </p>
-
-              {/* Value */}
-              <p className="text-2xl font-bold text-[var(--text-primary)] font-display tracking-tight mb-2">
-                {item.value}
-              </p>
-
-              {/* Trend + Signal */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[var(--text-secondary)]">
-                  {item.trend}
-                </span>
+              {/* Indicator name + signal */}
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest font-mono">
+                  {item.indicator}
+                </p>
                 <span
-                  className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider font-mono"
+                  className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-mono"
                   style={{ color: sStyle.color, backgroundColor: sStyle.bg }}
                 >
                   {item.signal}
                 </span>
               </div>
 
+              {/* Value — large */}
+              <p className="text-3xl font-black text-[var(--text-primary)] font-display tracking-tight mb-1">
+                {item.value}
+              </p>
+
+              {/* Trend date */}
+              <p className="text-[10px] text-[var(--text-dim)] font-mono">
+                As of {item.trend}
+              </p>
+
               {/* Expanded detail */}
               {isExpanded && (
                 <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] animate-slide-down">
                   <p className="text-[10px] font-bold text-[var(--accent-blue)] uppercase tracking-widest font-mono mb-2">
-                    Analysis
+                    Why it matters
                   </p>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                     {item.detail}

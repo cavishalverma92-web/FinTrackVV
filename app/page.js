@@ -235,6 +235,36 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* ── Source Footer ── */}
+      {intelligence.sources && (
+        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-[9px] font-black text-[var(--text-dim)] uppercase tracking-widest font-mono flex-shrink-0">
+              Live Sources
+            </span>
+            {[
+              ...([...new Set((intelligence.sources.rss || []).map((s) => s.source))].map((name) => {
+                const ok = (intelligence.sources.rss || []).some((s) => s.source === name && s.status === "ok");
+                return { name, ok, type: "rss" };
+              })),
+              ...(intelligence.sources.apis || []).map((s) => ({ name: s.source, ok: s.status === "ok", type: "api" })),
+            ].map((src) => (
+              <span
+                key={src.name}
+                className="inline-flex items-center gap-1 text-[9px] font-mono"
+                style={{ color: src.ok ? "var(--accent-green)" : "var(--accent-red)" }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+                  style={{ backgroundColor: src.ok ? "var(--accent-green)" : "var(--accent-red)" }}
+                />
+                {src.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

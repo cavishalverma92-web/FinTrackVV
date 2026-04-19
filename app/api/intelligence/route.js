@@ -438,10 +438,10 @@ function classifyCategory(text, fallback) {
 
 function classifySegment(text, category) {
   const lower = text.toLowerCase();
-  if (category === "AI & Tech" || [" ai ", "artificial intelligence", "machine learning", "automation", "credit scoring"].some((word) => ` ${lower} `.includes(word))) return "AI & Tech";
-  if (["moneyview", "money view", "kissht", "kreditbee", "navi", "lendingkart", "digital lending", "fintech lender", "phonepe", "paytm"].some((word) => lower.includes(word))) return "Digital Lenders";
-  if (["nbfc", "non banking", "bajaj finance", "shriram finance", "muthoot", "manappuram", "iifl", "poonawalla", "tata capital", "l&t finance"].some((word) => lower.includes(word))) return "NBFCs";
-  if ([" bank", "hdfc", "icici", "axis", "kotak", "sbi", "state bank", "bank of baroda", "canara", "union bank", "indusind"].some((word) => ` ${lower}`.includes(word))) return "Banks";
+  if (category === "AI & Tech" || [" ai ", "artificial intelligence", "machine learning", "automation", "credit scoring", "regtech", "insurtech", "wealthtech", "underwriting model", "fraud detection"].some((word) => ` ${lower} `.includes(word))) return "AI & Tech";
+  if (["moneyview", "money view", "kissht", "kreditbee", "navi fintech", "lendingkart", "digital lending", "fintech lender", "phonepe", "paytm", "bharatpe", "mobikwik", "zestmoney", "freo", "uni cards", "slice", "liquiloans", "stashfin", "fibe", "cashe", "aye finance", "lendbox", "faircent", "p2p lending"].some((word) => lower.includes(word))) return "Digital Lenders";
+  if (["nbfc", "non banking", "non-banking", "bajaj finance", "shriram finance", "muthoot", "manappuram", "iifl", "poonawalla", "tata capital", "l&t finance", "cholamandalam", "mahindra finance", "sundaram finance", "can fin", "aavas", "five star", "five-star", "creditaccess", "credit access", "fusion finance", "mas financial", "aptus", "repco", "microfinance", "nbfc-mfi", "mfi ", " mfi", "housing finance", "hfc ", " hfc", "msme lending", "sme finance", "sidbi", "arohan", "spandana", "asirvad", "bandhan", "home first", "aadhar housing", "india shelter", "ncd issuance", "debenture"].some((word) => lower.includes(word))) return "NBFCs";
+  if (["banking sector", "bank credit", "bank lending", "hdfc bank", "icici bank", "axis bank", "kotak bank", "kotak mahindra bank", "state bank of india", "sbi ", " sbi", "bank of baroda", "canara bank", "union bank", "indusind bank", "yes bank", "idfc first", "rbl bank", "federal bank", "pnb ", "punjab national"].some((word) => lower.includes(word))) return "Banks";
   return "Others";
 }
 

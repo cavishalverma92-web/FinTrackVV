@@ -92,64 +92,43 @@ function itemMatchesFreshness(item, hours) {
 
 const SEGMENT_KEYWORDS = {
   NBFCs: [
-    "nbfc",
-    "non banking",
-    "bajaj finance",
-    "shriram finance",
-    "muthoot",
-    "manappuram",
-    "iifl",
-    "poonawalla",
-    "tata capital",
-    "l&t finance",
-    "cholamandalam",
-    "mahindra finance",
-    "sundaram finance",
+    "nbfc", "non banking", "non-banking",
+    "bajaj finance", "shriram finance", "muthoot", "manappuram",
+    "iifl", "poonawalla", "tata capital", "l&t finance",
+    "cholamandalam", "mahindra finance", "sundaram finance",
+    "can fin", "aavas", "five star", "five-star",
+    "creditaccess", "credit access", "fusion finance",
+    "mas financial", "aptus", "repco", "home first",
+    "aadhar housing", "india shelter",
+    "microfinance", "nbfc-mfi", "mfi",
+    "housing finance", "hfc",
+    "msme lending", "sme finance", "sidbi",
+    "arohan", "spandana", "asirvad", "bandhan",
+    "ncd issuance", "non convertible debenture",
   ],
   "Digital Lenders": [
-    "digital lender",
-    "digital lending",
-    "fintech lender",
-    "moneyview",
-    "money view",
-    "kissht",
-    "kreditbee",
-    "navi",
-    "lendingkart",
-    "krazybee",
-    "zestmoney",
-    "paytm",
-    "phonepe",
-    "bharatpe",
-    "mobikwik",
+    "digital lender", "digital lending", "fintech lender",
+    "moneyview", "money view", "kissht", "kreditbee",
+    "navi", "lendingkart", "krazybee", "zestmoney",
+    "paytm", "phonepe", "bharatpe", "mobikwik",
+    "freo", "uni cards", "slice", "liquiloans",
+    "stashfin", "fibe", "cashe", "aye finance",
+    "lendbox", "faircent", "p2p lending",
   ],
   Banks: [
-    "bank",
-    "hdfc",
-    "icici",
-    "axis",
-    "kotak",
-    "sbi",
-    "state bank",
-    "bank of baroda",
-    "canara",
-    "union bank",
-    "indusind",
-    "yes bank",
-    "idfc first",
-    "rbl",
+    "hdfc bank", "icici bank", "axis bank", "kotak bank",
+    "kotak mahindra bank", "state bank of india", "sbi",
+    "bank of baroda", "canara bank", "union bank",
+    "indusind bank", "yes bank", "idfc first",
+    "rbl bank", "federal bank", "pnb", "punjab national",
+    "bank credit", "bank lending", "banking sector",
   ],
   "AI & Tech": [
-    "ai",
-    "artificial intelligence",
-    "machine learning",
-    "technology",
-    "tech",
-    "automation",
-    "underwriting model",
-    "data science",
-    "credit scoring",
-    "digital platform",
+    "artificial intelligence", "machine learning",
+    "automation", "underwriting model", "data science",
+    "credit scoring", "digital platform", "regtech",
+    "insurtech", "wealthtech", "fraud detection",
+    "generative ai", "llm", "fintech technology",
   ],
 };
 
@@ -206,11 +185,6 @@ export default function NewsFeed({
     .filter((item) => itemMatchesSearch(item, searchQuery));
   const sourceCount = (sources?.rss?.length || 0) + (sources?.apis?.length || 0);
   const updatedLabel = formatUpdatedAt(updatedAt);
-
-  const okSources = sources?.rss?.filter((s) => s.status === "ok") || [];
-  const failSources = sources?.rss?.filter((s) => s.status !== "ok") || [];
-  const uniqueOk = [...new Set(okSources.map((s) => s.source))];
-  const uniqueFail = [...new Set(failSources.map((s) => s.source))];
 
   return (
     <div>
@@ -289,31 +263,6 @@ export default function NewsFeed({
           </span>
         )}
       </div>
-
-      {/* ── Source pills ── */}
-      {(uniqueOk.length > 0 || uniqueFail.length > 0) && (
-        <div className="flex flex-wrap gap-1 mb-4 pb-3 border-b border-[var(--border-subtle)]">
-          <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono self-center mr-1">Live sources</span>
-          {uniqueOk.map((name) => (
-            <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold font-mono bg-[rgba(29,111,214,0.08)] text-[var(--accent-green)] tracking-wide">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)] inline-block flex-shrink-0" />
-              {name}
-            </span>
-          ))}
-          {uniqueFail.map((name) => (
-            <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold font-mono bg-[rgba(217,74,93,0.06)] text-[var(--accent-red)] tracking-wide">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-red)] inline-block flex-shrink-0" />
-              {name}
-            </span>
-          ))}
-          {sources?.apis?.map((api) => (
-            <span key={api.source} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold font-mono tracking-wide ${api.status === "ok" ? "bg-[rgba(94,167,239,0.08)] text-[var(--accent-blue)]" : "bg-[rgba(217,74,93,0.06)] text-[var(--accent-red)]"}`}>
-              <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${api.status === "ok" ? "bg-[var(--accent-blue)]" : "bg-[var(--accent-red)]"}`} />
-              {api.source}
-            </span>
-          ))}
-        </div>
-      )}
 
       <div className="flex flex-col gap-2">
         {filteredNews.map((item, index) => (

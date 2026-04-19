@@ -140,21 +140,24 @@ body {
 
 /* Card hover effect */
 .card-hover {
-  transition: all 0.18s ease;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
 }
 .card-hover:hover {
   background-color: var(--bg-card-hover);
   border-color: var(--border-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
 }
 
 /* Card base shadow */
 .card-shadow {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
 }
 .dark .card-shadow {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
+}
+.dark .card-hover:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 1px 4px rgba(0,0,0,0.3);
 }
 
 /* Category border colors (left inset) */

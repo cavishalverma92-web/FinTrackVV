@@ -22,13 +22,8 @@ export default function MaterialUpdates({ updates = [], onSelectNews }) {
   return (
     <section className="mb-4">
       <div className="flex items-center gap-3 mb-2">
-        <h2 className="text-sm font-bold font-display tracking-tight flex items-center gap-2">
+        <h2 className="text-sm font-bold font-display tracking-tight">
           Material Updates
-          {highCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--accent-red)] text-white font-mono">
-              {highCount} urgent
-            </span>
-          )}
         </h2>
         <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[rgba(29,111,214,0.1)] text-[var(--accent-green)] text-[9px] font-bold uppercase tracking-wider font-mono ml-auto">
           <Star size={9} /> Decision view
@@ -71,7 +66,7 @@ export default function MaterialUpdates({ updates = [], onSelectNews }) {
                     </span>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-[12px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-1">
+                    <h3 className="text-[12px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
                       {update.title}
                     </h3>
                     {update.url && (

@@ -238,30 +238,6 @@ export default function NewsFeed({
           {cache?.servedFromCache ? " · cached" : ""}
         </p>
 
-        {/* ── Source pills ── */}
-        {(uniqueOk.length > 0 || uniqueFail.length > 0) && (
-          <div className="flex flex-wrap gap-1 mb-1">
-            {uniqueOk.map((name) => (
-              <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono bg-[rgba(29,111,214,0.1)] text-[var(--accent-green)] uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)] inline-block" />
-                {name}
-              </span>
-            ))}
-            {uniqueFail.map((name) => (
-              <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono bg-[rgba(217,74,93,0.08)] text-[var(--accent-red)] uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-red)] inline-block" />
-                {name}
-              </span>
-            ))}
-            {sources?.apis?.map((api) => (
-              <span key={api.source} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono uppercase tracking-wide ${api.status === "ok" ? "bg-[rgba(94,167,239,0.1)] text-[var(--accent-blue)]" : "bg-[rgba(217,74,93,0.08)] text-[var(--accent-red)]"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full inline-block ${api.status === "ok" ? "bg-[var(--accent-blue)]" : "bg-[var(--accent-red)]"}`} />
-                {api.source}
-              </span>
-            ))}
-          </div>
-        )}
-
         {dataStatus === "fallback" && (
           <p className="text-[11px] text-[var(--accent-amber)] mt-1">
             Showing last snapshot — live refresh unavailable. {dataError}
@@ -275,11 +251,11 @@ export default function NewsFeed({
             key={f}
             onClick={() => setFilter(f)}
             className={`
-              px-3 py-1.5 rounded-md text-[11px] font-semibold
-              cursor-pointer transition-all border-none
+              px-3 py-1 rounded-full text-[11px] font-semibold
+              cursor-pointer transition-all border
               ${filter === f
-                ? "bg-[var(--accent-green)] text-white"
-                : "bg-[var(--bg-elevated)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"
+                ? "bg-[var(--accent-green)] text-white border-[var(--accent-green)]"
+                : "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
               }
             `}
           >
@@ -297,10 +273,10 @@ export default function NewsFeed({
             key={option.label}
             onClick={() => handleFreshnessChange(option.hours)}
             className={`
-              px-3 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all
+              px-3 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-all border
               ${freshness === option.hours
-                ? "bg-[var(--accent-blue)] text-white"
-                : "bg-[var(--bg-elevated)] text-[var(--text-dim)] hover:text-[var(--text-secondary)]"
+                ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)]"
+                : "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
               }
             `}
           >
@@ -313,6 +289,31 @@ export default function NewsFeed({
           </span>
         )}
       </div>
+
+      {/* ── Source pills ── */}
+      {(uniqueOk.length > 0 || uniqueFail.length > 0) && (
+        <div className="flex flex-wrap gap-1 mb-4 pb-3 border-b border-[var(--border-subtle)]">
+          <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono self-center mr-1">Live sources</span>
+          {uniqueOk.map((name) => (
+            <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold font-mono bg-[rgba(29,111,214,0.08)] text-[var(--accent-green)] tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)] inline-block flex-shrink-0" />
+              {name}
+            </span>
+          ))}
+          {uniqueFail.map((name) => (
+            <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold font-mono bg-[rgba(217,74,93,0.06)] text-[var(--accent-red)] tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-red)] inline-block flex-shrink-0" />
+              {name}
+            </span>
+          ))}
+          {sources?.apis?.map((api) => (
+            <span key={api.source} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold font-mono tracking-wide ${api.status === "ok" ? "bg-[rgba(94,167,239,0.08)] text-[var(--accent-blue)]" : "bg-[rgba(217,74,93,0.06)] text-[var(--accent-red)]"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full inline-block flex-shrink-0 ${api.status === "ok" ? "bg-[var(--accent-blue)]" : "bg-[var(--accent-red)]"}`} />
+              {api.source}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {filteredNews.map((item, index) => (

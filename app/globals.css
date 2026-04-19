@@ -1,0 +1,154 @@
+/* ============================================================
+   GLOBAL STYLES
+   This file sets up the color theme, fonts, and base styles.
+   To change the look, edit the CSS variables below.
+   ============================================================ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Import Google Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+/* ── Color Variables (edit these to change the theme) ── */
+:root {
+  --bg-primary: #F6F8FB;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F6F9;
+  --bg-elevated: #EAF0F5;
+
+  --border-subtle: #DDE6EE;
+  --border-hover: #BDD0DE;
+
+  --accent-green: #1D6FD6;
+  --accent-red: #D94A5D;
+  --accent-amber: #B7791F;
+  --accent-blue: #5EA7EF;
+
+  --text-primary: #17212B;
+  --text-secondary: #435365;
+  --text-dim: #6C7A89;
+}
+
+/* ── Dark Mode Variables ── */
+.dark {
+  --bg-primary: #0F1419;
+  --bg-card: #1A2233;
+  --bg-card-hover: #1E2A3F;
+  --bg-elevated: #243044;
+  --border-subtle: #2D3F55;
+  --border-hover: #3D5470;
+  --text-primary: #E8F0F8;
+  --text-secondary: #9BB3C8;
+  --text-dim: #6A8099;
+}
+
+/* ── Base Styles ── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar Styling ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29, 111, 214, 0.28); }
+  50% { box-shadow: 0 0 0 6px rgba(29, 111, 214, 0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.3s ease-out forwards;
+}
+
+.pulse-live {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ── Staggered animation delays for lists ── */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.30s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.40s; }
+
+/* ── Utility Classes ── */
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.font-display {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+}
+.card-hover:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(36, 116, 204, 0.16);
+  color: var(--text-primary);
+}

@@ -207,51 +207,64 @@ export default function NewsFeed({
   const sourceCount = (sources?.rss?.length || 0) + (sources?.apis?.length || 0);
   const updatedLabel = formatUpdatedAt(updatedAt);
 
+  const okSources = sources?.rss?.filter((s) => s.status === "ok") || [];
+  const failSources = sources?.rss?.filter((s) => s.status !== "ok") || [];
+  const uniqueOk = [...new Set(okSources.map((s) => s.source))];
+  const uniqueFail = [...new Set(failSources.map((s) => s.source))];
+
   return (
     <div>
       <div className="mb-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-lg font-bold font-display tracking-tight">
-              Live Intelligence Feed
-            </h2>
-            <p className="text-xs text-[var(--text-dim)] mt-1">
-              {dataStatus === "loading" ? "Refreshing live sources" : "Real-time updates from trusted sources"}
-              {" "}- {newsItems.length} items
-              {filteredNews.length !== newsItems.length ? ` - ${filteredNews.length} visible` : ""}
-          {sourceCount ? ` - ${sourceCount} sources` : ""}
-          {updatedLabel ? ` - Updated ${updatedLabel}` : ""}
-          {cache?.servedFromCache ? " - cached" : ""}
-        </p>
-        {cache?.savedAt && (
-          <p className="text-[10px] text-[var(--text-dim)] mt-1 font-mono">
-            Last good snapshot: {new Date(cache.savedAt).toLocaleString("en-IN", {
-              day: "numeric",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-        )}
-          </div>
+        {/* ── Title row with refresh inline ── */}
+        <div className="flex items-center gap-3 mb-1">
+          <h2 className="text-lg font-bold font-display tracking-tight flex-1">
+            Live Intelligence Feed
+          </h2>
           <button
             onClick={onRefresh}
             disabled={dataStatus === "loading"}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--accent-green)] text-white text-[11px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-green)] text-white text-[11px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-wait flex-shrink-0"
           >
-            <RefreshCw size={13} className={dataStatus === "loading" ? "animate-spin" : ""} />
-            News Refresh
+            <RefreshCw size={12} className={dataStatus === "loading" ? "animate-spin" : ""} />
+            Refresh
           </button>
         </div>
-        {dataStatus === "fallback" && (
-          <p className="text-[11px] text-[var(--accent-amber)] mt-2">
-            Live source refresh is unavailable, showing the last local snapshot. {dataError}
-          </p>
+
+        {/* ── Subtitle ── */}
+        <p className="text-xs text-[var(--text-dim)] mb-2">
+          {newsItems.length} articles
+          {filteredNews.length !== newsItems.length ? ` · ${filteredNews.length} visible` : ""}
+          {updatedLabel ? ` · Updated ${updatedLabel}` : ""}
+          {cache?.servedFromCache ? " · cached" : ""}
+        </p>
+
+        {/* ── Source pills ── */}
+        {(uniqueOk.length > 0 || uniqueFail.length > 0) && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            {uniqueOk.map((name) => (
+              <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono bg-[rgba(29,111,214,0.1)] text-[var(--accent-green)] uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)] inline-block" />
+                {name}
+              </span>
+            ))}
+            {uniqueFail.map((name) => (
+              <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono bg-[rgba(217,74,93,0.08)] text-[var(--accent-red)] uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-red)] inline-block" />
+                {name}
+              </span>
+            ))}
+            {sources?.apis?.map((api) => (
+              <span key={api.source} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold font-mono uppercase tracking-wide ${api.status === "ok" ? "bg-[rgba(94,167,239,0.1)] text-[var(--accent-blue)]" : "bg-[rgba(217,74,93,0.08)] text-[var(--accent-red)]"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full inline-block ${api.status === "ok" ? "bg-[var(--accent-blue)]" : "bg-[var(--accent-red)]"}`} />
+                {api.source}
+              </span>
+            ))}
+          </div>
         )}
-        {dataStatus === "ready" && sources?.rss?.length > 0 && (
-          <p className="text-[10px] text-[var(--text-dim)] mt-2 font-mono">
-            RSS: {sources.rss.map((source) => source.source).join(", ")}
-            {sources.apis?.length ? ` - APIs: ${sources.apis.map((source) => source.source).join(", ")}` : ""}
+
+        {dataStatus === "fallback" && (
+          <p className="text-[11px] text-[var(--accent-amber)] mt-1">
+            Showing last snapshot — live refresh unavailable. {dataError}
           </p>
         )}
       </div>

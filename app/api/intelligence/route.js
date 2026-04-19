@@ -135,6 +135,56 @@ const RSS_FEEDS = [
     url: "https://news.google.com/rss/search?q=%28RBI%20OR%20SEBI%29%20%28digital%20lending%20OR%20DLG%20OR%20DLA%20OR%20co-lending%20OR%20priority%20sector%20OR%20NBFC%20regulation%29%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Regulation",
   },
+  {
+    source: "BQ Prime",
+    url: "https://news.google.com/rss/search?q=site%3Abqprime.com%20%28NBFC%20OR%20banking%20OR%20finance%20OR%20RBI%20OR%20lending%20OR%20credit%29&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "PIB",
+    url: "https://pib.gov.in/RssMain.aspx",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Inc42",
+    url: "https://inc42.com/feed/",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News MFI",
+    url: "https://news.google.com/rss/search?q=%28microfinance%20OR%20%22NBFC-MFI%22%20OR%20%22micro%20finance%20institution%22%20OR%20%22MFI%20India%22%20OR%20%22Jana%20Small%20Finance%22%20OR%20Arohan%20OR%20CreditAccess%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Risk Signal",
+  },
+  {
+    source: "Google News MSME Lending",
+    url: "https://news.google.com/rss/search?q=%28%22MSME%20lending%22%20OR%20%22SME%20finance%22%20OR%20%22small%20business%20loan%22%20OR%20%22MSME%20credit%22%20OR%20SIDBI%20OR%20%22MSME%20sector%22%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Housing Finance",
+    url: "https://news.google.com/rss/search?q=%28%22housing%20finance%22%20OR%20HFC%20OR%20%22home%20loan%22%20OR%20%22National%20Housing%20Bank%22%20OR%20NHB%20OR%20%22affordable%20housing%22%29%20India%20NBFC%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News NCD Bond",
+    url: "https://news.google.com/rss/search?q=%28NCD%20OR%20%22non%20convertible%20debenture%22%20OR%20%22bond%20issuance%22%20OR%20%22debt%20raise%22%20OR%20%22commercial%20paper%22%29%20%28NBFC%20OR%20lender%20OR%20finance%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "VCCircle",
+    url: "https://news.google.com/rss/search?q=site%3Avcircle.com%20%28fintech%20OR%20lending%20OR%20NBFC%20OR%20credit%20OR%20finance%29&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News SIDBI",
+    url: "https://news.google.com/rss/search?q=%28SIDBI%20OR%20%22Small%20Industries%20Development%20Bank%22%29%20%28lending%20OR%20MSME%20OR%20co-lending%20OR%20refinance%20OR%20credit%29%20when%3A60d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News NHB",
+    url: "https://news.google.com/rss/search?q=%28NHB%20OR%20%22National%20Housing%20Bank%22%29%20%28circular%20OR%20lending%20OR%20housing%20finance%20OR%20regulation%20OR%20HFC%29%20when%3A60d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Regulation",
+  },
 ];
 
 const NEWS_APIS = [
@@ -271,6 +321,16 @@ const RELEVANCE_WORDS = [
   "bond",
   "asset quality",
   "npa",
+  "mfi",
+  "microfinance",
+  "msme",
+  "hfc",
+  "housing finance",
+  "ncd",
+  "sidbi",
+  "nhb",
+  "pib",
+  "fintech",
 ];
 
 const SOURCE_WEIGHTS = {
@@ -292,6 +352,16 @@ const SOURCE_WEIGHTS = {
   "Google News CGFMU": 22,
   "Google News RBI Regulatory Updates": 26,
   GDELT: 12,
+  "BQ Prime": 22,
+  PIB: 30,
+  Inc42: 18,
+  "Google News MFI": 18,
+  "Google News MSME Lending": 18,
+  "Google News Housing Finance": 18,
+  "Google News NCD Bond": 20,
+  VCCircle: 16,
+  "Google News SIDBI": 22,
+  "Google News NHB": 24,
 };
 
 const CATEGORY_WEIGHTS = {

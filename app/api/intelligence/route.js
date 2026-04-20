@@ -1303,73 +1303,49 @@ function buildCoLendingData(newsItems) {
 }
 
 function buildGovtSchemes(newsItems) {
-  const liveUpdates = newsItems
-    .filter((item) => {
-      const text = `${item.headline} ${item.tldr} ${item.tags?.join(" ") || ""}`.toLowerCase();
-      return [
-        "cgfmu",
-        "credit guarantee",
-        "ncgtc",
-        "msme",
-        "scheme",
-        "priority sector",
-        "psl",
-        "co-lending",
-        "digital lending",
-        "dlg",
-        "dla",
-        "rbi",
-        "sebi",
-        "regulation",
-        "circular",
-        "guideline",
-        "direction",
-      ].some((word) => text.includes(word));
-    })
-    .slice(0, 8)
-    .map((item) => ({
-      scheme: item.headline,
-      coverage: "See source",
-      guarantee: "See source",
-      validTill: item.time,
-      eligibleEntities: item.segment === "Banks" ? "Banks and regulated entities" : "NBFCs, banks, MFIs, MSMEs, or regulated entities as specified",
-      totalApprovals: item.source,
-      impactOnCreditCost: item.risk === "High" ? "Monitor" : "Potential support",
-      status: item.category === "Regulation" ? "Regulatory Update" : item.time.includes("m ago") || item.time.includes("h ago") ? "New Update" : "Active & Growing",
-      source: item.source,
-      summary: item.tldr,
-      url: item.url,
-    }));
+  const POLICY_KEYWORDS = [
+    // RBI & SEBI regulatory
+    "rbi", "sebi", "circular", "notification", "guideline", "direction", "master direction",
+    "regulation", "compliance", "penalty", "framework", "monetary policy",
+    // Lending policy
+    "repo rate", "crr", "slr", "priority sector", "psl", "co-lending", "colending",
+    "digital lending", "dlg", "dla", "lending service provider", "lsp",
+    "nbfc regulation", "nbfc circular", "bank regulation", "fair practices",
+    "interest rate", "base rate", "mclr", "credit policy",
+    // Schemes & incentives
+    "scheme", "credit guarantee", "cgfmu", "ncgtc", "eclgs", "mudra",
+    "pm kisan", "jan dhan", "pmjdy", "financial inclusion", "interest subvention",
+    "credit subsidy", "pm svanidhi", "pm svandidhi", "stand up india",
+    "startup india", "atmanirbhar", "credit flow", "refinance",
+    // Housing & MSME
+    "nhb", "national housing bank", "sidbi", "nabard", "msme credit",
+    "affordable housing", "pradhan mantri awas", "pmay",
+    // Ministry & Govt
+    "ministry of finance", "government scheme", "budget", "fiscal",
+    "finance ministry", "niti aayog", "pib",
+    // Global/macro policy
+    "fed rate", "us federal", "imf", "world bank", "basel",
+  ];
 
-  return [
-    {
-      scheme: "CGFMU (Credit Guarantee Fund for Micro Units)",
-      coverage: "Up to eligible micro-unit limits",
-      guarantee: "Scheme-linked guarantee cover",
-      validTill: "Track NCGTC / Ministry updates",
-      eligibleEntities: "Eligible micro borrowers through member lending institutions including banks, NBFCs and MFIs",
-      totalApprovals: "NCGTC / Ministry source",
-      impactOnCreditCost: "Can reduce loss given default for eligible MSME/micro loans",
-      status: "Core Scheme",
-      source: "NCGTC / Ministry of Finance",
-      summary: "Pinned scheme to monitor credit guarantee support for micro and MSME lending. Live CGFMU news and changes appear below.",
-      url: "https://www.ncgtc.in/",
-    },
-    {
-      scheme: "RBI Digital Lending / DLG / DLA Updates",
-      coverage: "Digital lending compliance",
-      guarantee: "DLG and LSP rules where applicable",
-      validTill: "Ongoing",
-      eligibleEntities: "Regulated entities, lending service providers and digital lending apps",
-      totalApprovals: "RBI source",
-      impactOnCreditCost: "Impacts partnerships, disclosures, loss guarantees and customer protection controls",
-      status: "Regulatory Watch",
-      source: "RBI",
-      summary: "Pinned radar for RBI digital lending directions, default loss guarantee rules, DLA reporting and LSP governance.",
-      url: "https://www.rbi.org.in/Scripts/BS_CircularIndexDisplay.aspx",
-    },
-    ...liveUpdates,
-  ].slice(0, 10);
+  return newsItems
+    .filter((item) => {
+      const text = `${item.headline} ${item.tldr} ${item.tags?.join(" ") || ""} ${item.source}`.toLowerCase();
+      return POLICY_KEYWORDS.some((word) => text.includes(word));
+    })
+    .slice(0, 25)
+    .map((item) => ({
+      id: item.id,
+      headline: item.headline,
+      tldr: item.tldr,
+      source: item.source,
+      time: item.time,
+      url: item.url,
+      category: item.category,
+      risk: item.risk,
+      segment: item.segment,
+      tags: item.tags || [],
+      trending: item.trending || false,
+    }));
 }
 
 async function buildIntelligencePayload() {

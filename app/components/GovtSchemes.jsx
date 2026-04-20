@@ -1,163 +1,213 @@
-// ============================================================
-// GOVT SCHEMES — CGFMU & Credit Guarantee Tracker
-//
-// Tracks government schemes that impact NBFC lending:
-// - CGFMU (Credit Guarantee Fund for Micro Units)
-// - ECLGS (Emergency Credit Line)
-// - PSL Co-Lending Framework
-//
-// Shows coverage, guarantee %, impact on credit cost.
-// ============================================================
-
 "use client";
 
-import { Shield, TrendingDown, Building2, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Flame, Clock, Shield } from "lucide-react";
 
-// Status styling
-function statusStyle(status) {
+const TABS = ["All", "RBI", "SEBI", "Schemes", "Policy", "Macro"];
+
+const TAB_KEYWORDS = {
+  RBI: ["rbi", "reserve bank", "repo rate", "crr", "slr", "mclr", "monetary policy"],
+  SEBI: ["sebi", "securities"],
+  Schemes: ["scheme", "credit guarantee", "cgfmu", "ncgtc", "eclgs", "mudra", "pmay",
+            "jan dhan", "pmjdy", "financial inclusion", "interest subvention", "sidbi", "nabard",
+            "stand up india", "startup india", "svanidhi", "atmanirbhar"],
+  Policy: ["circular", "guideline", "notification", "direction", "regulation", "compliance",
+           "co-lending", "digital lending", "dlg", "dla", "priority sector", "psl",
+           "ministry of finance", "pib", "budget", "nhb"],
+  Macro: ["fed rate", "us federal", "imf", "world bank", "basel", "global", "inflation",
+          "interest rate", "yield", "us 10y", "forex"],
+};
+
+function matchesTab(item, tab) {
+  if (tab === "All") return true;
+  const text = `${item.headline} ${item.tldr} ${item.source} ${item.tags?.join(" ") || ""}`.toLowerCase();
+  return (TAB_KEYWORDS[tab] || []).some((kw) => text.includes(kw));
+}
+
+function categoryColor(category) {
   const map = {
-    "Extended": { color: "var(--accent-green)", bg: "rgba(29,111,214,0.12)", icon: CheckCircle2 },
-    "Core Scheme": { color: "var(--accent-green)", bg: "rgba(29,111,214,0.12)", icon: Shield },
-    "Regulatory Watch": { color: "var(--accent-blue)", bg: "rgba(94,167,239,0.14)", icon: Building2 },
-    "Regulatory Update": { color: "var(--accent-blue)", bg: "rgba(94,167,239,0.14)", icon: Building2 },
-    "New Update": { color: "var(--accent-amber)", bg: "rgba(255,181,71,0.12)", icon: CheckCircle2 },
-    "Active & Growing": { color: "var(--accent-green)", bg: "rgba(29,111,214,0.12)", icon: TrendingDown },
-    "Winding Down": { color: "var(--accent-amber)", bg: "rgba(255,181,71,0.12)", icon: Building2 },
+    Regulation: "var(--accent-amber)",
+    "Credit Rating": "var(--accent-green)",
+    "Risk Signal": "var(--accent-red)",
+    Policy: "#8B6FBF",
+    Fundraise: "var(--accent-blue)",
+    Partnership: "var(--accent-blue)",
+    "AI & Tech": "var(--accent-blue)",
   };
-  return map[status] || map["Extended"];
+  return map[category] || "var(--text-dim)";
+}
+
+function riskColor(risk) {
+  if (risk === "High") return "var(--accent-red)";
+  if (risk === "Medium") return "var(--accent-amber)";
+  return "var(--text-dim)";
+}
+
+function Tag({ label, color }) {
+  return (
+    <span
+      className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider font-mono"
+      style={{ color, backgroundColor: `${color}18` }}
+    >
+      {label}
+    </span>
+  );
 }
 
 export default function GovtSchemes({ govtSchemes = [] }) {
-  const topInsight = govtSchemes[0]?.summary || govtSchemes[0]?.scheme || "Live policy feeds are refreshing. Scheme signals will populate as source data arrives.";
+  const [activeTab, setActiveTab] = useState("All");
+
+  const filtered = govtSchemes.filter((item) => matchesTab(item, activeTab));
+
+  const rbiCount = govtSchemes.filter((item) => matchesTab(item, "RBI")).length;
+  const schemeCount = govtSchemes.filter((item) => matchesTab(item, "Schemes")).length;
+  const policyCount = govtSchemes.filter((item) => matchesTab(item, "Policy")).length;
 
   return (
     <div className="animate-fade-in">
       {/* ── Header ── */}
       <div className="mb-5">
         <h2 className="text-lg font-bold font-display tracking-tight">
-          Government Schemes & Regulatory Updates
+          Regulatory & Policy Intelligence
         </h2>
         <p className="text-xs text-[var(--text-dim)] mt-1">
-          CGFMU, credit guarantees, PSL, co-lending and RBI/SEBI updates impacting financial services
+          RBI circulars · SEBI notifications · Govt schemes · Lending incentives · Macro policy
         </p>
       </div>
 
-      {/* ── Key Insight Box ── */}
-      <div className="p-4 rounded-xl bg-[rgba(29,111,214,0.08)] border border-[rgba(29,111,214,0.15)] mb-6 border-l-[3px] border-l-[var(--accent-green)]">
-        <div className="flex items-center gap-2 mb-2">
-          <Shield size={14} className="text-[var(--accent-green)]" />
-          <p className="text-[10px] font-bold text-[var(--accent-green)] uppercase tracking-widest font-mono">
-            Key Insight
-          </p>
-        </div>
-        <p className="text-xs text-[var(--text-primary)] leading-relaxed">
-          {topInsight}
-        </p>
+      {/* ── Stats bar ── */}
+      <div className="flex items-center gap-4 mb-5 p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] flex-wrap">
+        <StatPill label="Total" value={govtSchemes.length} color="var(--text-primary)" />
+        <div className="w-px h-5 bg-[var(--border-subtle)]" />
+        <StatPill label="RBI" value={rbiCount} color="var(--accent-amber)" />
+        <div className="w-px h-5 bg-[var(--border-subtle)]" />
+        <StatPill label="Schemes" value={schemeCount} color="var(--accent-green)" />
+        <div className="w-px h-5 bg-[var(--border-subtle)]" />
+        <StatPill label="Policy" value={policyCount} color="#8B6FBF" />
       </div>
 
-      {/* ── Scheme Cards ── */}
-      <div className="flex flex-col gap-4">
-        {govtSchemes.map((scheme, index) => {
-          const sStyle = statusStyle(scheme.status);
-          const StatusIcon = sStyle.icon;
+      {/* ── Pinned reference ── */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {[
+          { label: "RBI Circulars", url: "https://www.rbi.org.in/Scripts/BS_CircularIndexDisplay.aspx", color: "var(--accent-amber)" },
+          { label: "RBI Press Releases", url: "https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx", color: "var(--accent-amber)" },
+          { label: "NCGTC / CGFMU", url: "https://www.ncgtc.in/", color: "var(--accent-green)" },
+          { label: "SEBI Orders", url: "https://www.sebi.gov.in/enforcement/orders/", color: "var(--accent-blue)" },
+          { label: "PIB Finance", url: "https://pib.gov.in/", color: "#8B6FBF" },
+        ].map((link) => (
+          <a
+            key={link.label}
+            href={link.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all hover:opacity-80"
+            style={{ color: link.color, borderColor: `${link.color}40`, backgroundColor: `${link.color}10` }}
+          >
+            <Shield size={9} />
+            {link.label}
+            <ExternalLink size={8} />
+          </a>
+        ))}
+      </div>
 
-          return (
-            <div
-              key={index}
-              className={`
-                rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]
-                overflow-hidden animate-fade-in stagger-${index + 1}
-              `}
-            >
-              {/* Scheme Header */}
-              <div className="p-5 border-b border-[var(--border-subtle)]">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div>
-                    <h3 className="text-sm font-bold text-[var(--text-primary)] mb-1">
-                      {scheme.url ? (
-                        <a href={scheme.url} target="_blank" rel="noreferrer" className="text-[var(--accent-green)] hover:underline">
-                          {scheme.scheme}
-                        </a>
-                      ) : scheme.scheme}
-                    </h3>
-                    <p className="text-[11px] text-[var(--text-dim)]">
-                      Source: {scheme.source || "Configured sources"} · {scheme.validTill}
-                    </p>
-                  </div>
-                  <span
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider font-mono flex-shrink-0"
-                    style={{ color: sStyle.color, backgroundColor: sStyle.bg }}
-                  >
-                    <StatusIcon size={12} />
-                    {scheme.status}
-                  </span>
-                </div>
-              </div>
+      {/* ── Category Tabs ── */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-all border
+              ${activeTab === tab
+                ? "bg-[var(--accent-green)] text-white border-[var(--accent-green)]"
+                : "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
+              }`}
+          >
+            {tab}
+            {tab !== "All" && (
+              <span className="ml-1 opacity-60">
+                ({govtSchemes.filter((item) => matchesTab(item, tab)).length})
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
 
-              {/* Scheme Details Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-[var(--border-subtle)]">
-                {/* Coverage Limit */}
-                <div className="p-4 bg-[var(--bg-card)]">
-                  <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-1">
-                    Coverage
-                  </p>
-                  <p className="text-lg font-bold text-[var(--accent-green)] font-display">
-                    {scheme.coverage}
-                  </p>
-                </div>
-
-                {/* Guarantee % */}
-                <div className="p-4 bg-[var(--bg-card)]">
-                  <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-1">
-                    Guarantee
-                  </p>
-                  <p className="text-lg font-bold text-[var(--text-primary)] font-display">
-                    {scheme.guarantee}
-                  </p>
-                </div>
-
-                {/* Total Approvals */}
-                <div className="p-4 bg-[var(--bg-card)]">
-                  <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-1">
-                    Total Approvals
-                  </p>
-                  <p className="text-lg font-bold text-[var(--text-primary)] font-display">
-                    {scheme.totalApprovals}
-                  </p>
-                </div>
-
-                {/* Credit Cost Impact */}
-                <div className="p-4 bg-[var(--bg-card)]">
-                  <p className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-1">
-                    Credit Cost Impact
-                  </p>
-                  <p className="text-lg font-bold text-[var(--accent-green)] font-display">
-                    {scheme.impactOnCreditCost}
-                  </p>
-                </div>
-              </div>
-
-              {/* Eligible Entities */}
-              <div className="px-5 py-3 border-t border-[var(--border-subtle)]">
-                <span className="text-[10px] text-[var(--text-dim)]">Eligible: </span>
-                <span className="text-[11px] text-[var(--text-secondary)] font-medium">
-                  {scheme.eligibleEntities}
+      {/* ── News Feed ── */}
+      <div className="flex flex-col gap-2">
+        {filtered.map((item, index) => (
+          <article
+            key={item.id || index}
+            className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] card-shadow card-hover animate-fade-in"
+            style={{ borderLeftWidth: "3px", borderLeftColor: categoryColor(item.category) }}
+          >
+            {/* Row 1 — meta */}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <Tag label={item.source} color="var(--accent-blue)" />
+              <Tag label={item.category} color={categoryColor(item.category)} />
+              {item.trending && <Flame size={12} className="text-[var(--accent-amber)]" />}
+              {item.risk === "High" && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[rgba(217,74,93,0.12)] text-[var(--accent-red)] font-mono uppercase">
+                  High Risk
                 </span>
-                {scheme.summary && (
-                  <p className="text-[11px] text-[var(--text-dim)] mt-2 leading-relaxed">
-                    {scheme.summary}
-                  </p>
-                )}
+              )}
+              <div className="ml-auto flex items-center gap-1 text-[10px] text-[var(--text-dim)] font-mono">
+                <Clock size={10} />
+                {item.time}
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* ── Data Source Note ── */}
-      <p className="text-[10px] text-[var(--text-dim)] mt-5 font-mono">
-        Sources: RBI, Ministry of Finance, SEBI, ET BFSI and other configured live feeds
-      </p>
+            {/* Row 2 — headline */}
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug mb-2">
+              {item.headline}
+            </h3>
+
+            {/* Row 3 — tldr */}
+            {item.tldr && (
+              <p className="text-[11px] text-[var(--text-dim)] leading-relaxed line-clamp-2 mb-2">
+                {item.tldr}
+              </p>
+            )}
+
+            {/* Row 4 — tags + link */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex gap-1.5 flex-wrap">
+                {(item.tags || []).slice(0, 3).map((tag) => (
+                  <span key={tag} className="text-[9px] font-mono text-[var(--text-dim)] px-1.5 py-0.5 rounded bg-[var(--bg-primary)]">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              {item.url && (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-blue)] hover:underline flex-shrink-0"
+                >
+                  Read <ExternalLink size={10} />
+                </a>
+              )}
+            </div>
+          </article>
+        ))}
+
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-[var(--text-dim)]">
+            <p className="text-3xl mb-3 opacity-20">⌀</p>
+            <p className="text-sm font-semibold">No {activeTab} items in current feed</p>
+            <p className="text-xs mt-1 opacity-70">Try switching to All or refresh the feed</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatPill({ label, value, color }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-base font-black font-display" style={{ color }}>{value}</span>
+      <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">{label}</span>
     </div>
   );
 }

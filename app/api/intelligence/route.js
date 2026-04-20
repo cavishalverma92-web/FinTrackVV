@@ -77,8 +77,8 @@ const RSS_FEEDS = [
   },
   {
     source: "Google News Digital Lending",
-    url: "https://news.google.com/rss/search?q=%22digital%20lending%22%20India%20OR%20KreditBee%20OR%20Moneyview%20OR%20Kissht%20OR%20Navi&hl=en-IN&gl=IN&ceid=IN:en",
-    defaultCategory: "AI & Tech",
+    url: "https://news.google.com/rss/search?q=%28%22digital%20lending%22%20OR%20KreditBee%20OR%20MoneyView%20OR%20Kissht%20OR%20%22Navi%20Technologies%22%20OR%20%22Navi%20fintech%22%20OR%20%22Navi%20loan%22%20OR%20%22Sachin%20Bansal%20Navi%22%29%20India&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
   },
   {
     source: "Google News Banks",
@@ -505,7 +505,9 @@ function classifySegment(text, category) {
 
   // Digital Lenders
   if ([
-    "moneyview", "money view", "kissht", "kreditbee", "navi fintech", "navi app",
+    "moneyview", "money view", "kissht", "kreditbee",
+    "navi fintech", "navi app", "navi technologies", "navi mutual fund",
+    "navi loan", "navi insurance", "navi.com", "sachin bansal navi",
     "lendingkart", "digital lending", "fintech lender", "digital lender",
     "paytm lending", "phonepe loan", "bharatpe lending", "mobikwik",
     "zestmoney", "freo", "uni cards", "slice pay", "liquiloans", "stashfin",

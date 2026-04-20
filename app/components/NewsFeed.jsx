@@ -109,7 +109,8 @@ const SEGMENT_KEYWORDS = {
   "Digital Lenders": [
     "digital lender", "digital lending", "fintech lender",
     "moneyview", "money view", "kissht", "kreditbee",
-    "navi fintech", "lendingkart", "krazybee", "zestmoney",
+    "navi fintech", "navi technologies", "navi mutual fund", "navi loan", "navi insurance", "sachin bansal navi",
+    "lendingkart", "krazybee", "zestmoney",
     "paytm lending", "phonepe loan", "bharatpe", "mobikwik",
     "freo", "uni cards", "slice pay", "liquiloans",
     "stashfin", "fibe", "early salary", "cashe", "aye finance",

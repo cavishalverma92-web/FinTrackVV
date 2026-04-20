@@ -272,25 +272,25 @@ function fallbackPayload(error) {
 }
 
 const FINANCE_SYMBOLS = [
-  { name: "Bajaj Finance", symbol: "BAJFINANCE.NS", screenerSlug: "BAJFINANCE" },
-  { name: "Shriram Finance", symbol: "SHRIRAMFIN.NS", screenerSlug: "SHRIRAMFIN" },
-  { name: "Poonawalla Fincorp", symbol: "POONAWALLA.NS", screenerSlug: "POONAWALLA" },
-  { name: "Muthoot Finance", symbol: "MUTHOOTFIN.NS", screenerSlug: "MUTHOOTFIN" },
-  { name: "Manappuram Finance", symbol: "MANAPPURAM.NS", screenerSlug: "MANAPPURAM" },
-  { name: "IIFL Finance", symbol: "IIFL.NS", screenerSlug: "IIFL" },
-  { name: "L&T Finance", symbol: "LTF.NS", screenerSlug: "LTF" },
-  { name: "Cholamandalam Investment", symbol: "CHOLAFIN.NS", screenerSlug: "CHOLAFIN" },
-  { name: "Mahindra Finance", symbol: "M&MFIN.NS", screenerSlug: "M&MFIN" },
-  { name: "Sundaram Finance", symbol: "SUNDARMFIN.NS", screenerSlug: "SUNDARMFIN" },
-  { name: "Can Fin Homes", symbol: "CANFINHOME.NS", screenerSlug: "CANFINHOME" },
-  { name: "Aavas Financiers", symbol: "AAVAS.NS", screenerSlug: "AAVAS" },
-  { name: "Home First Finance", symbol: "HOMEFIRST.NS", screenerSlug: "HOMEFIRST" },
-  { name: "Five-Star Business Finance", symbol: "FIVESTAR.NS", screenerSlug: "FIVESTAR" },
-  { name: "CreditAccess Grameen", symbol: "CREDITACC.NS", screenerSlug: "CREDITACC" },
-  { name: "Fusion Finance", symbol: "FUSION.NS", screenerSlug: "FUSION" },
-  { name: "MAS Financial Services", symbol: "MASFIN.NS", screenerSlug: "MASFIN" },
-  { name: "Aptus Value Housing", symbol: "APTUS.NS", screenerSlug: "APTUS" },
-  { name: "Repco Home Finance", symbol: "REPCOHOME.NS", screenerSlug: "REPCOHOME" },
+  { name: "Bajaj Finance", symbol: "BAJFINANCE.NS", screenerSlug: "BAJFINANCE", bseCode: "532978" },
+  { name: "Shriram Finance", symbol: "SHRIRAMFIN.NS", screenerSlug: "SHRIRAMFIN", bseCode: "511218" },
+  { name: "Poonawalla Fincorp", symbol: "POONAWALLA.NS", screenerSlug: "POONAWALLA", bseCode: "533260" },
+  { name: "Muthoot Finance", symbol: "MUTHOOTFIN.NS", screenerSlug: "MUTHOOTFIN", bseCode: "533398" },
+  { name: "Manappuram Finance", symbol: "MANAPPURAM.NS", screenerSlug: "MANAPPURAM", bseCode: "531213" },
+  { name: "IIFL Finance", symbol: "IIFL.NS", screenerSlug: "IIFL", bseCode: "532636" },
+  { name: "L&T Finance", symbol: "LTF.NS", screenerSlug: "LTF", bseCode: "533519" },
+  { name: "Cholamandalam Investment", symbol: "CHOLAFIN.NS", screenerSlug: "CHOLAFIN", bseCode: "511243" },
+  { name: "Mahindra Finance", symbol: "M&MFIN.NS", screenerSlug: "M&MFIN", bseCode: "532720" },
+  { name: "Sundaram Finance", symbol: "SUNDARMFIN.NS", screenerSlug: "SUNDARMFIN", bseCode: "590071" },
+  { name: "Can Fin Homes", symbol: "CANFINHOME.NS", screenerSlug: "CANFINHOME", bseCode: "511196" },
+  { name: "Aavas Financiers", symbol: "AAVAS.NS", screenerSlug: "AAVAS", bseCode: "541988" },
+  { name: "Home First Finance", symbol: "HOMEFIRST.NS", screenerSlug: "HOMEFIRST", bseCode: "543259" },
+  { name: "Five-Star Business Finance", symbol: "FIVESTAR.NS", screenerSlug: "FIVESTAR", bseCode: "543386" },
+  { name: "CreditAccess Grameen", symbol: "CREDITACC.NS", screenerSlug: "CREDITACC", bseCode: "541770" },
+  { name: "Fusion Finance", symbol: "FUSION.NS", screenerSlug: "FUSION", bseCode: "543652" },
+  { name: "MAS Financial Services", symbol: "MASFIN.NS", screenerSlug: "MASFIN", bseCode: "540749" },
+  { name: "Aptus Value Housing", symbol: "APTUS.NS", screenerSlug: "APTUS", bseCode: "543335" },
+  { name: "Repco Home Finance", symbol: "REPCOHOME.NS", screenerSlug: "REPCOHOME", bseCode: "535322" },
 ];
 
 const CATEGORY_KEYWORDS = [
@@ -857,10 +857,14 @@ async function fetchMarketData() {
     throw new Error("Market data unavailable from Yahoo quote and chart endpoints");
   }
 
-  const screenerData = await fetchScreenerData();
+  const [screenerData, bsePresentations] = await Promise.all([
+    fetchScreenerData(),
+    fetchBsePresentations(),
+  ]);
   peerData = peerData.map((peer) => {
     const meta = FINANCE_SYMBOLS.find((item) => item.symbol === peer.symbol);
     const screener = screenerData[meta?.screenerSlug] || {};
+    const bse = bsePresentations[meta?.bseCode] || {};
     return {
       ...peer,
       aum: peer.aum || screener.marketCap || 0,
@@ -870,6 +874,8 @@ async function fetchMarketData() {
       pb: screener.pb || ((peer.price || screener.currentPrice) && screener.bookValue ? Number(((peer.price || screener.currentPrice) / screener.bookValue).toFixed(2)) : 0),
       roe: screener.roe || peer.roe,
       roce: screener.roce || 0,
+      roa: screener.roa || 0,
+      loanBook: screener.loanBook || 0,
       qtrProfit: screener.qtrProfit || 0,
       qtrSales: screener.qtrSales || 0,
       bookValue: screener.bookValue || 0,
@@ -877,6 +883,8 @@ async function fetchMarketData() {
       debtToEquity: screener.debtToEquity || 0,
       assetSize: screener.assetSize || 0,
       screenerUrl: meta?.screenerSlug ? `https://www.screener.in/company/${meta.screenerSlug}/consolidated/` : null,
+      presentationUrl: bse.presentationUrl || null,
+      presentationDate: bse.presentationDate || null,
       dataSource: screener.source || marketSource,
     };
   });
@@ -952,6 +960,10 @@ async function fetchScreenerData() {
     }, 5000);
     if (!response.ok) throw new Error(`Screener ${item.screenerSlug} returned ${response.status}`);
     const html = await response.text();
+    const assetSize = extractLatestRowNumber(html, "Total Assets") || extractScreenerNumber(html, "Total Assets") || extractScreenerNumber(html, "Assets");
+    const qtrProfit = extractLatestRowNumber(html, "Net Profit") || extractScreenerNumber(html, "Net Profit");
+    const loanBook = extractLatestRowNumber(html, "Advances") || extractLatestRowNumber(html, "Loans") || extractLatestRowNumber(html, "Loan Book") || extractScreenerNumber(html, "Advances") || 0;
+    const roa = extractScreenerNumber(html, "Return on Assets") || extractScreenerNumber(html, "ROA") || (assetSize && qtrProfit ? Number(((qtrProfit * 4) / assetSize * 100).toFixed(2)) : 0);
     return {
       slug: item.screenerSlug,
       source: "Screener",
@@ -963,16 +975,50 @@ async function fetchScreenerData() {
       dividendYield: extractScreenerNumber(html, "Dividend Yield"),
       roe: extractScreenerNumber(html, "ROE"),
       roce: extractScreenerNumber(html, "ROCE"),
-      qtrProfit: extractLatestRowNumber(html, "Net Profit") || extractScreenerNumber(html, "Net Profit"),
+      roa,
+      loanBook,
+      qtrProfit,
       qtrSales: extractLatestRowNumber(html, "Revenue") || extractLatestRowNumber(html, "Sales") || extractScreenerNumber(html, "Sales"),
       debtToEquity: extractScreenerNumber(html, "Debt to equity"),
-      assetSize: extractLatestRowNumber(html, "Total Assets") || extractScreenerNumber(html, "Total Assets") || extractScreenerNumber(html, "Assets"),
+      assetSize,
     };
   }));
 
   return Object.fromEntries(results
     .filter((result) => result.status === "fulfilled" && result.value?.slug)
     .map((result) => [result.value.slug, result.value]));
+}
+
+async function fetchBsePresentations() {
+  const today = new Date();
+  const sixMonthsAgo = new Date(today);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const fmt = (d) => `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
+
+  const results = await Promise.allSettled(
+    FINANCE_SYMBOLS.filter((item) => item.bseCode).map(async (item) => {
+      const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?strCat=Presentation&strPrevDate=${fmt(sixMonthsAgo)}&strScripCd=${item.bseCode}&strSearch=P&strToDate=${fmt(today)}&strType=C&subcategory=-1`;
+      const response = await fetchWithTimeout(url, {
+        headers: { "User-Agent": "Mozilla/5.0 LendingIQ/1.0", "Referer": "https://www.bseindia.com" },
+      }, 5000);
+      if (!response.ok) return null;
+      const json = await response.json();
+      const filings = json?.Table || [];
+      const latest = filings.find((f) => f.ATTACHMENT && /\.pdf$/i.test(f.ATTACHMENT));
+      if (!latest) return null;
+      return {
+        bseCode: item.bseCode,
+        presentationUrl: `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${latest.ATTACHMENT}`,
+        presentationDate: latest.NEWS_DT ? latest.NEWS_DT.split("T")[0] : null,
+      };
+    })
+  );
+
+  return Object.fromEntries(
+    results
+      .filter((r) => r.status === "fulfilled" && r.value)
+      .map((r) => [r.value.bseCode, r.value])
+  );
 }
 
 async function fetchYahooChartData() {

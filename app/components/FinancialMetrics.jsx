@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 
 function Sparkline({ data = [], color, width = 80, height = 24 }) {
   const clean = data.length ? data.map((item) => Number(item || 0)) : [0, 0];
@@ -136,6 +136,9 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
   const patCoverage = peerData.filter((peer) => peer.qtrProfit).length;
   const pbCoverage = peerData.filter((peer) => peer.pb).length;
   const assetCoverage = peerData.filter((peer) => peer.assetSize).length;
+  const aumCoverage = peerData.filter((peer) => peer.loanBook).length;
+  const roaCoverage = peerData.filter((peer) => peer.roa).length;
+  const deckCoverage = peerData.filter((peer) => peer.presentationUrl).length;
 
   return (
     <div className="animate-fade-in">
@@ -144,7 +147,7 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
           Financial Services Metrics
         </h2>
         <p className="text-xs text-[var(--text-dim)] mt-1">
-          Market data, Screener links and best-effort public financial ratios
+          Market data · Loan Book (AUM) · ROA · BSE investor decks · Screener ratios
         </p>
       </div>
 
@@ -171,9 +174,12 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Coverage label="Loan Book" value={aumCoverage} total={peerData.length} />
+            <Coverage label="ROA" value={roaCoverage} total={peerData.length} />
             <Coverage label="PAT" value={patCoverage} total={peerData.length} />
             <Coverage label="P/B" value={pbCoverage} total={peerData.length} />
             <Coverage label="Assets" value={assetCoverage} total={peerData.length} />
+            <Coverage label="Investor Deck" value={deckCoverage} total={peerData.length} />
           </div>
         </div>
       </div>
@@ -191,9 +197,12 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
               <tr className="border-b border-[var(--border-subtle)]">
                 {[
                   { label: "Entity", align: "left" },
+                  { label: "Deck", align: "center" },
                   { label: "Price", align: "right" },
                   { label: "Mkt Cap", align: "right" },
+                  { label: "Loan Book (AUM)", align: "right" },
                   { label: "Asset Size", align: "right" },
+                  { label: "ROA %", align: "right" },
                   { label: "GNPA %", align: "right" },
                   { label: "ROE %", align: "right" },
                   { label: "ROCE %", align: "right" },
@@ -232,6 +241,19 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
                       </a>
                     ) : peer.name}
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    {peer.presentationUrl ? (
+                      <a
+                        href={peer.presentationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={peer.presentationDate ? `Investor deck · ${peer.presentationDate}` : "Investor presentation"}
+                        className="inline-flex items-center justify-center text-[var(--accent-blue)] hover:text-[var(--accent-green)]"
+                      >
+                        <FileText size={13} />
+                      </a>
+                    ) : <span className="text-[var(--text-dim)]">—</span>}
+                  </td>
                   <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
                     {peer.price ? `Rs ${peer.price}` : "-"}
                   </td>
@@ -239,7 +261,13 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
                     {formatRsCr(peer.marketCap)}
                   </td>
                   <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
+                    {formatRsCr(peer.loanBook)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
                     {formatRsCr(peer.assetSize)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: peer.roa > 2 ? "var(--accent-green)" : peer.roa > 1 ? "var(--accent-amber)" : "var(--text-secondary)" }}>
+                    {peer.roa ? `${peer.roa}%` : "-"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: gnpaColor(peer.gnpa) }}>
                     {peer.gnpa ? `${peer.gnpa}%` : "-"}

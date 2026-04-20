@@ -54,7 +54,7 @@ function Tag({ label, color }) {
   );
 }
 
-export default function GovtSchemes({ govtSchemes = [] }) {
+export default function GovtSchemes({ govtSchemes = [], onSelectNews }) {
   const [activeTab, setActiveTab] = useState("All");
 
   const filtered = govtSchemes.filter((item) => matchesTab(item, activeTab));
@@ -137,7 +137,8 @@ export default function GovtSchemes({ govtSchemes = [] }) {
         {filtered.map((item, index) => (
           <article
             key={item.id || index}
-            className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] card-shadow card-hover animate-fade-in"
+            onClick={() => onSelectNews?.(item)}
+            className={`p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] card-shadow animate-fade-in ${onSelectNews ? "cursor-pointer card-hover" : ""}`}
             style={{ borderLeftWidth: "3px", borderLeftColor: categoryColor(item.category) }}
           >
             {/* Row 1 — meta */}

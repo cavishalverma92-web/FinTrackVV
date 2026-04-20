@@ -50,6 +50,21 @@ function MetricCard({ metric }) {
   );
 }
 
+function percentileColor(value, allValues, higherIsBetter = true) {
+  const clean = allValues.map(Number).filter(Boolean).sort((a, b) => a - b);
+  if (!clean.length || !value) return "var(--text-secondary)";
+  const idx = clean.findIndex((v) => v >= Number(value));
+  const pct = idx === -1 ? 1 : idx / clean.length;
+  if (higherIsBetter) {
+    if (pct >= 0.67) return "var(--accent-green)";
+    if (pct <= 0.33) return "var(--accent-red)";
+  } else {
+    if (pct <= 0.33) return "var(--accent-green)";
+    if (pct >= 0.67) return "var(--accent-red)";
+  }
+  return "var(--text-secondary)";
+}
+
 function gnpaColor(value) {
   if (value > 3) return "var(--accent-red)";
   if (value > 2) return "var(--accent-amber)";
@@ -133,6 +148,12 @@ function RadarCard({ item }) {
 
 export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) {
   const radar = buildRadar(peerData);
+  const allROA = peerData.map((p) => p.roa);
+  const allROE = peerData.map((p) => p.roe);
+  const allROCE = peerData.map((p) => p.roce);
+  const allGNPA = peerData.map((p) => p.gnpa);
+  const allPB = peerData.map((p) => p.pb);
+  const allPE = peerData.map((p) => p.pe);
   const patCoverage = peerData.filter((peer) => peer.qtrProfit).length;
   const pbCoverage = peerData.filter((peer) => peer.pb).length;
   const assetCoverage = peerData.filter((peer) => peer.assetSize).length;
@@ -182,6 +203,14 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
             <Coverage label="Investor Deck" value={deckCoverage} total={peerData.length} />
           </div>
         </div>
+      </div>
+
+      <div className="flex items-center gap-4 mb-3 text-[10px] font-mono text-[var(--text-dim)]">
+        <span className="font-semibold uppercase tracking-wider">Peer rank:</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block bg-[var(--accent-green)]" /> Top third</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block bg-[var(--text-secondary)]" /> Middle</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block bg-[var(--accent-red)]" /> Bottom third</span>
+        <span className="opacity-60">· P/E and P/B: lower = better (green)</span>
       </div>
 
       <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl overflow-hidden">
@@ -266,16 +295,16 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
                   <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
                     {formatRsCr(peer.assetSize)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: peer.roa > 2 ? "var(--accent-green)" : peer.roa > 1 ? "var(--accent-amber)" : "var(--text-secondary)" }}>
+                  <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: percentileColor(peer.roa, allROA, true) }}>
                     {peer.roa ? `${peer.roa}%` : "-"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: gnpaColor(peer.gnpa) }}>
                     {peer.gnpa ? `${peer.gnpa}%` : "-"}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono" style={{ color: roeColor(peer.roe) }}>
+                  <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: percentileColor(peer.roe, allROE, true) }}>
                     {peer.roe ? `${peer.roe}%` : "-"}
                   </td>
-                  <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
+                  <td className="px-4 py-3 text-right font-mono font-semibold" style={{ color: percentileColor(peer.roce, allROCE, true) }}>
                     {peer.roce ? `${peer.roce}%` : "-"}
                   </td>
                   <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
@@ -296,10 +325,10 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
                   <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
                     {peer.cof ? `${peer.cof}%` : "-"}
                   </td>
-                  <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
+                  <td className="px-4 py-3 text-right font-mono" style={{ color: percentileColor(peer.pe, allPE, false) }}>
                     {peer.pe ? `${peer.pe}x` : "-"}
                   </td>
-                  <td className="px-4 py-3 text-right text-[var(--text-secondary)] font-mono">
+                  <td className="px-4 py-3 text-right font-mono" style={{ color: percentileColor(peer.pb, allPB, false) }}>
                     {peer.pb ? `${peer.pb}x` : "-"}
                   </td>
                   <td className={`px-4 py-3 text-right font-mono font-semibold ${Number(peer.disbGrowth || 0) >= 0 ? "text-[var(--accent-green)]" : "text-[var(--accent-red)]"}`}>

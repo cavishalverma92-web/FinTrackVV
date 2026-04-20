@@ -45,6 +45,23 @@ function getRiskRatio(newsItems) {
   return { risks, opportunities, mood };
 }
 
+function getSegmentCounts(newsItems) {
+  const counts = { NBFCs: 0, "Digital Lenders": 0, Banks: 0, "AI & Tech": 0, Others: 0 };
+  newsItems.forEach((item) => {
+    if (counts[item.segment] !== undefined) counts[item.segment]++;
+    else counts.Others++;
+  });
+  return counts;
+}
+
+const SEGMENT_COLORS = {
+  NBFCs: "var(--accent-amber)",
+  "Digital Lenders": "var(--accent-blue)",
+  Banks: "var(--accent-green)",
+  "AI & Tech": "#8B6FBF",
+  Others: "var(--text-dim)",
+};
+
 function getMacroSnippet(globalData = []) {
   const find = (label) => globalData.find((item) => item.indicator?.toLowerCase().includes(label.toLowerCase()));
   const usdInr = find("USD/INR");
@@ -59,6 +76,7 @@ export default function DailyBrief({
   brief,
   globalData = [],
   dataStatus = "ready",
+  onSelectNews,
 }) {
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
@@ -72,6 +90,8 @@ export default function DailyBrief({
   const topThree = getTopThree(newsItems);
   const { risks, opportunities, mood } = getRiskRatio(newsItems);
   const macroSnippet = getMacroSnippet(globalData);
+  const segmentCounts = getSegmentCounts(newsItems);
+  const totalSegment = Object.values(segmentCounts).reduce((a, b) => a + b, 0) || 1;
 
   const marketPulse = brief?.marketPulse || newsItems.slice(0, 4).map((item) => item.headline).join(" ");
   const riskSignals = brief?.riskSignals?.length
@@ -138,6 +158,38 @@ export default function DailyBrief({
           )}
         </div>
 
+        {/* ── Segment Heat Bar ── */}
+        {newsItems.length > 0 && (
+          <div className="mb-6">
+            <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-2">
+              Today's Activity by Segment
+            </p>
+            <div className="flex h-2 rounded-full overflow-hidden mb-2">
+              {Object.entries(segmentCounts)
+                .filter(([, count]) => count > 0)
+                .map(([seg, count]) => (
+                  <div
+                    key={seg}
+                    style={{ width: `${(count / totalSegment) * 100}%`, backgroundColor: SEGMENT_COLORS[seg] }}
+                    title={`${seg}: ${count}`}
+                  />
+                ))}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {Object.entries(segmentCounts)
+                .filter(([, count]) => count > 0)
+                .sort(([, a], [, b]) => b - a)
+                .map(([seg, count]) => (
+                  <span key={seg} className="flex items-center gap-1.5 text-[10px] font-mono">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: SEGMENT_COLORS[seg] }} />
+                    <span className="text-[var(--text-dim)]">{seg}</span>
+                    <span className="font-bold text-[var(--text-secondary)]">{count}</span>
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+
         {/* ── 3 Things That Matter Today ── */}
         {topThree.length > 0 && (
           <div className="mb-6">
@@ -151,7 +203,8 @@ export default function DailyBrief({
               {topThree.map((item, i) => (
                 <div
                   key={item.id}
-                  className="flex gap-3 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]"
+                  onClick={() => onSelectNews?.(item)}
+                  className={`flex gap-3 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] ${onSelectNews ? "cursor-pointer hover:border-[var(--border-hover)] hover:bg-[var(--bg-elevated)] transition-colors" : ""}`}
                 >
                   <span className="text-[11px] font-black text-[var(--accent-amber)] font-mono flex-shrink-0 mt-0.5">
                     {i + 1}.
@@ -233,7 +286,8 @@ export default function DailyBrief({
           {newsItems.slice(0, 6).map((item, i) => (
             <div
               key={item.id}
-              className={`flex gap-3 py-3 ${i < Math.min(newsItems.length, 6) - 1 ? "border-b border-[var(--border-subtle)]" : ""}`}
+              onClick={() => onSelectNews?.(item)}
+              className={`flex gap-3 py-3 ${i < Math.min(newsItems.length, 6) - 1 ? "border-b border-[var(--border-subtle)]" : ""} ${onSelectNews ? "cursor-pointer hover:opacity-80 transition-opacity rounded px-1 -mx-1" : ""}`}
             >
               <span className="text-[10px] font-black text-[var(--accent-green)] font-mono flex-shrink-0 mt-1 w-5 tabular-nums">
                 {String(i + 1).padStart(2, "0")}

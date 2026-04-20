@@ -23,7 +23,7 @@ const ICONS = {
   RefreshCw: RefreshCw,
 };
 
-export default function Sidebar({ activeTab, onTabChange, open = false, onClose }) {
+export default function Sidebar({ activeTab, onTabChange, open = false, onClose, tabCounts = {} }) {
   return (
     <>
       {/* Mobile overlay backdrop */}
@@ -67,9 +67,10 @@ export default function Sidebar({ activeTab, onTabChange, open = false, onClose 
             >
               {Icon && <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />}
               <span>{tab.label}</span>
-              {/* Show a dot for tabs with new content */}
-              {tab.id === "feed" && (
-                <div className="ml-auto w-2 h-2 rounded-full bg-[var(--accent-green)]" />
+              {tabCounts[tab.id] > 0 && (
+                <span className={`ml-auto text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-full ${isActive ? "bg-white/20 text-white" : "bg-[var(--bg-primary)] text-[var(--text-dim)]"}`}>
+                  {tabCounts[tab.id]}
+                </span>
               )}
             </button>
           );

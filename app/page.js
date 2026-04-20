@@ -96,6 +96,11 @@ export default function Dashboard() {
     setSelectedNews(null);
   };
 
+  const handleSelectAndNavigate = (newsItem) => {
+    setSelectedNews(newsItem);
+    setActiveTab("feed");
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col">
       {/* ── TOP BAR ── */}
@@ -119,6 +124,21 @@ export default function Dashboard() {
         />
       )}
 
+      {/* ── STALENESS WARNING ── */}
+      {intelligence.updatedAt && Date.now() - new Date(intelligence.updatedAt).getTime() > 2 * 60 * 60 * 1000 && (
+        <div className="flex items-center justify-between gap-3 px-6 py-2 bg-[rgba(183,121,31,0.1)] border-b border-[rgba(183,121,31,0.25)]">
+          <p className="text-[11px] text-[var(--accent-amber)] font-mono">
+            ⚠ Data last refreshed {Math.floor((Date.now() - new Date(intelligence.updatedAt).getTime()) / 3600000)}h ago — feed may be stale
+          </p>
+          <button
+            onClick={() => loadIntelligence(true)}
+            className="text-[11px] font-bold text-[var(--accent-amber)] hover:underline cursor-pointer"
+          >
+            Refresh now
+          </button>
+        </div>
+      )}
+
       {/* ── MAIN CONTENT AREA ── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar Navigation */}
@@ -127,6 +147,15 @@ export default function Dashboard() {
           onTabChange={handleTabChange}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          tabCounts={{
+            feed: intelligence.newsItems.length,
+            summary: intelligence.materialUpdates.length,
+            ratings: intelligence.ratingChanges.length,
+            metrics: intelligence.peerData.length,
+            colending: intelligence.coLendingData.length,
+            schemes: intelligence.govtSchemes.length,
+            global: intelligence.globalData.length,
+          }}
         />
 
         {/* Main Content Area */}
@@ -187,6 +216,7 @@ export default function Dashboard() {
                 brief={intelligence.dailyBrief}
                 globalData={intelligence.globalData}
                 dataStatus={dataStatus}
+                onSelectNews={handleSelectAndNavigate}
               />
               <WatchlistPanel watchlist={intelligence.watchlist} />
             </>
@@ -215,7 +245,7 @@ export default function Dashboard() {
 
           {/* ─── GOVT SCHEMES TAB ─── */}
           {activeTab === "schemes" && (
-            <GovtSchemes govtSchemes={intelligence.govtSchemes} />
+            <GovtSchemes govtSchemes={intelligence.govtSchemes} onSelectNews={handleSelectAndNavigate} />
           )}
 
           {/* ─── GLOBAL INTEL TAB ─── */}

@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 
 const RSS_FEEDS = [
   {
@@ -185,6 +185,53 @@ const RSS_FEEDS = [
     url: "https://news.google.com/rss/search?q=%28NHB%20OR%20%22National%20Housing%20Bank%22%29%20%28circular%20OR%20lending%20OR%20housing%20finance%20OR%20regulation%20OR%20HFC%29%20when%3A60d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Regulation",
   },
+  // ── Digital Lenders ──
+  {
+    source: "Google News Digital Lenders",
+    url: "https://news.google.com/rss/search?q=%28KreditBee%20OR%20MoneyView%20OR%20Kissht%20OR%20Navi%20OR%20Fibe%20OR%20%22Early%20Salary%22%20OR%20StashFin%20OR%20CASHe%20OR%20LazyPay%20OR%20Simpl%20OR%20Slice%20OR%20Freo%20OR%20%22Aye%20Finance%22%20OR%20Lendingkart%20OR%20FlexiLoans%20OR%20Indifi%20OR%20NeoGrowth%20OR%20Oxyzo%20OR%20Mintifi%20OR%20Progcap%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News Fintech Platforms",
+    url: "https://news.google.com/rss/search?q=%28Yubi%20OR%20%22CredAvenue%22%20OR%20%22Northern%20Arc%22%20OR%20%22Vivriti%20Capital%22%20OR%20GetVantage%20OR%20%22Recur%20Club%22%20OR%20%22Rupeek%22%20OR%20%22ZestMoney%22%20OR%20LiquiLoans%20OR%20Lendbox%20OR%20Faircent%20OR%20%22P2P%20lending%22%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News BNPL",
+    url: "https://news.google.com/rss/search?q=%28%22buy%20now%20pay%20later%22%20OR%20BNPL%20OR%20%22pay%20later%22%20OR%20%22Amazon%20Pay%20Later%22%20OR%20%22Flipkart%20Pay%20Later%22%20OR%20%22Tata%20Neu%20Finance%22%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "AI & Tech",
+  },
+  {
+    source: "Google News Embedded Finance",
+    url: "https://news.google.com/rss/search?q=%28%22embedded%20finance%22%20OR%20%22embedded%20lending%22%20OR%20%22account%20aggregator%22%20OR%20OCEN%20OR%20%22open%20credit%22%20OR%20%22neobank%22%20OR%20%22neo-bank%22%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "AI & Tech",
+  },
+  // ── AI & Tech in FS ──
+  {
+    source: "Google News Fintech AI",
+    url: "https://news.google.com/rss/search?q=%28%22generative%20AI%22%20OR%20%22AI%20in%20lending%22%20OR%20%22AI%20in%20banking%22%20OR%20%22AI%20underwriting%22%20OR%20%22AI%20credit%22%20OR%20%22LLM%20finance%22%20OR%20%22AI%20fintech%22%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "AI & Tech",
+  },
+  {
+    source: "Google News RegTech",
+    url: "https://news.google.com/rss/search?q=%28regtech%20OR%20%22regulatory%20technology%22%20OR%20%22eKYC%22%20OR%20%22video%20KYC%22%20OR%20%22fraud%20detection%22%20OR%20%22AML%20technology%22%20OR%20%22digital%20KYC%22%29%20India%20fintech%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "AI & Tech",
+  },
+  {
+    source: "Google News Digital Rupee",
+    url: "https://news.google.com/rss/search?q=%28%22digital%20rupee%22%20OR%20CBDC%20OR%20%22UPI%20credit%22%20OR%20%22account%20aggregator%22%20OR%20%22AA%20framework%22%20OR%20ONDC%20OR%20%22open%20banking%22%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "AI & Tech",
+  },
+  {
+    source: "Entrackr",
+    url: "https://entrackr.com/feed/",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "ET Tech",
+    url: "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms",
+    defaultCategory: "AI & Tech",
+  },
 ];
 
 const NEWS_APIS = [
@@ -304,33 +351,22 @@ const CATEGORY_KEYWORDS = [
 ];
 
 const RELEVANCE_WORDS = [
-  "nbfc",
-  "lending",
-  "loan",
-  "credit",
-  "bank",
-  "finance",
-  "fintech",
-  "rbi",
-  "sebi",
-  "ncd",
-  "msme",
-  "co-lending",
-  "rating",
-  "debt",
-  "bond",
-  "asset quality",
-  "npa",
-  "mfi",
-  "microfinance",
-  "msme",
-  "hfc",
-  "housing finance",
-  "ncd",
-  "sidbi",
-  "nhb",
-  "pib",
-  "fintech",
+  "nbfc", "lending", "loan", "credit", "bank", "finance", "fintech", "rbi", "sebi",
+  "ncd", "msme", "co-lending", "rating", "debt", "bond", "asset quality", "npa",
+  "mfi", "microfinance", "hfc", "housing finance", "sidbi", "nhb", "pib",
+  // digital lenders
+  "digital lender", "kreditbee", "moneyview", "kissht", "navi", "fibe", "stashfin",
+  "cashe", "lazypay", "simpl", "lendingkart", "flexiloans", "indifi", "neogrowth",
+  "oxyzo", "mintifi", "progcap", "yubi", "credavenue", "northern arc", "vivriti",
+  "getvantage", "recur club", "rupeek", "zestmoney", "liquiloans", "lendbox", "faircent",
+  "p2p lending", "bnpl", "buy now pay later", "pay later", "embedded finance",
+  "neobank", "neo-bank", "account aggregator", "ocen", "open credit",
+  // AI & Tech in FS
+  "generative ai", "llm", "large language model", "ai in lending", "ai in banking",
+  "ai underwriting", "regtech", "insurtech", "wealthtech", "fraud detection",
+  "ekyc", "video kyc", "digital kyc", "credit scoring model", "underwriting model",
+  "digital rupee", "cbdc", "upi credit", "ondc", "open banking", "aa framework",
+  "fintech technology", "machine learning", "automation", "ai fintech",
 ];
 
 const SOURCE_WEIGHTS = {
@@ -362,6 +398,15 @@ const SOURCE_WEIGHTS = {
   VCCircle: 16,
   "Google News SIDBI": 22,
   "Google News NHB": 24,
+  "Google News Digital Lenders": 20,
+  "Google News Fintech Platforms": 20,
+  "Google News BNPL": 18,
+  "Google News Embedded Finance": 20,
+  "Google News Fintech AI": 22,
+  "Google News RegTech": 20,
+  "Google News Digital Rupee": 20,
+  Entrackr: 18,
+  "ET Tech": 20,
 };
 
 const CATEGORY_WEIGHTS = {
@@ -371,7 +416,7 @@ const CATEGORY_WEIGHTS = {
   Fundraise: 20,
   Partnership: 18,
   Policy: 18,
-  "AI & Tech": 12,
+  "AI & Tech": 20,
 };
 
 function decodeEntities(value = "") {
@@ -438,10 +483,68 @@ function classifyCategory(text, fallback) {
 
 function classifySegment(text, category) {
   const lower = text.toLowerCase();
-  if (category === "AI & Tech" || [" ai ", "artificial intelligence", "machine learning", "automation", "credit scoring", "regtech", "insurtech", "wealthtech", "underwriting model", "fraud detection"].some((word) => ` ${lower} `.includes(word))) return "AI & Tech";
-  if (["moneyview", "money view", "kissht", "kreditbee", "navi fintech", "lendingkart", "digital lending", "fintech lender", "phonepe", "paytm", "bharatpe", "mobikwik", "zestmoney", "freo", "uni cards", "slice", "liquiloans", "stashfin", "fibe", "cashe", "aye finance", "lendbox", "faircent", "p2p lending"].some((word) => lower.includes(word))) return "Digital Lenders";
-  if (["nbfc", "non banking", "non-banking", "bajaj finance", "shriram finance", "muthoot", "manappuram", "iifl", "poonawalla", "tata capital", "l&t finance", "cholamandalam", "mahindra finance", "sundaram finance", "can fin", "aavas", "five star", "five-star", "creditaccess", "credit access", "fusion finance", "mas financial", "aptus", "repco", "microfinance", "nbfc-mfi", "mfi ", " mfi", "housing finance", "hfc ", " hfc", "msme lending", "sme finance", "sidbi", "arohan", "spandana", "asirvad", "bandhan", "home first", "aadhar housing", "india shelter", "ncd issuance", "debenture"].some((word) => lower.includes(word))) return "NBFCs";
-  if (["banking sector", "bank credit", "bank lending", "hdfc bank", "icici bank", "axis bank", "kotak bank", "kotak mahindra bank", "state bank of india", "sbi ", " sbi", "bank of baroda", "canara bank", "union bank", "indusind bank", "yes bank", "idfc first", "rbl bank", "federal bank", "pnb ", "punjab national"].some((word) => lower.includes(word))) return "Banks";
+
+  // AI & Tech — broad FS/finance technology signals
+  if (
+    category === "AI & Tech" ||
+    [
+      "generative ai", "large language model", "llm ", " llm", "ai in lending", "ai in banking",
+      "ai underwriting", "ai credit", "ai fintech", "ai-powered lending", "ai-driven",
+      "regtech", "insurtech", "wealthtech", "fraud detection", "underwriting model",
+      "credit scoring model", "machine learning", "automation in lending",
+      "ekyc", "video kyc", "digital kyc", "kyc automation",
+      "account aggregator", "aa framework", "ocen", "open credit enablement",
+      "digital rupee", "cbdc", "upi credit line", "ondc", "open banking",
+      "neobank", "neo-bank", "embedded finance", "embedded lending",
+      "robo advisor", "wealthtech", "insurtech",
+      "nucleus software", "intellect design", "newgen software", "finacus",
+      "perfios", "setu ", " setu", "signzy", "idfy", "karza", "bureau.id", "finbox", "lentra",
+    ].some((word) => lower.includes(word)) ||
+    [" ai ", "artificial intelligence"].some((word) => ` ${lower} `.includes(word))
+  ) return "AI & Tech";
+
+  // Digital Lenders
+  if ([
+    "moneyview", "money view", "kissht", "kreditbee", "navi fintech", "navi app",
+    "lendingkart", "digital lending", "fintech lender", "digital lender",
+    "paytm lending", "phonepe loan", "bharatpe lending", "mobikwik",
+    "zestmoney", "freo", "uni cards", "slice pay", "liquiloans", "stashfin",
+    "fibe", "early salary", "cashe", "aye finance", "lendbox", "faircent",
+    "p2p lending", "bnpl", "buy now pay later", "pay later",
+    "lazypay", "simpl", "amazon pay later", "flipkart pay later", "tata neu finance",
+    "flexiloans", "indifi", "neogrowth", "oxyzo", "mintifi", "progcap",
+    "yubi", "credavenue", "cred avenue", "northern arc capital", "vivriti capital",
+    "getvantage", "recur club", "rupeek", "paysense", "finnable",
+    "krazybee", "incred", "ring ",
+  ].some((word) => lower.includes(word))) return "Digital Lenders";
+
+  // NBFCs
+  if ([
+    "nbfc", "non banking", "non-banking",
+    "bajaj finance", "shriram finance", "muthoot", "manappuram",
+    "iifl", "poonawalla", "tata capital", "l&t finance",
+    "cholamandalam", "mahindra finance", "sundaram finance",
+    "can fin", "aavas", "five star", "five-star",
+    "creditaccess", "credit access", "fusion finance",
+    "mas financial", "aptus", "repco", "home first",
+    "aadhar housing", "india shelter",
+    "microfinance", "nbfc-mfi", "mfi ", " mfi",
+    "housing finance", "hfc ", " hfc",
+    "msme lending", "sme finance", "sidbi",
+    "arohan", "spandana", "asirvad", "bandhan",
+    "ncd issuance", "non convertible debenture", "debenture",
+  ].some((word) => lower.includes(word))) return "NBFCs";
+
+  // Banks
+  if ([
+    "banking sector", "bank credit", "bank lending",
+    "hdfc bank", "icici bank", "axis bank", "kotak bank", "kotak mahindra bank",
+    "state bank of india", "sbi ", " sbi", "bank of baroda", "canara bank",
+    "union bank", "indusind bank", "yes bank", "idfc first",
+    "rbl bank", "federal bank", "pnb ", "punjab national",
+    "au small finance", "jana bank", "equitas bank", "ujjivan",
+  ].some((word) => lower.includes(word))) return "Banks";
+
   return "Others";
 }
 

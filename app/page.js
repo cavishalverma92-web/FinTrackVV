@@ -181,13 +181,14 @@ export default function Dashboard() {
           {activeTab === "summary" && (
             <>
               <MaterialUpdates updates={intelligence.materialUpdates} />
-              <WatchlistPanel watchlist={intelligence.watchlist} />
               <DailyBrief
                 newsItems={intelligence.newsItems}
                 ratingChanges={intelligence.ratingChanges}
                 brief={intelligence.dailyBrief}
+                globalData={intelligence.globalData}
                 dataStatus={dataStatus}
               />
+              <WatchlistPanel watchlist={intelligence.watchlist} />
             </>
           )}
 
@@ -199,11 +200,11 @@ export default function Dashboard() {
           {/* ─── FINANCIALS TAB ─── */}
           {activeTab === "metrics" && (
             <>
-              <WatchlistPanel watchlist={intelligence.watchlist} />
               <FinancialMetrics
                 sectorMetrics={intelligence.sectorMetrics}
                 peerData={intelligence.peerData}
               />
+              <WatchlistPanel watchlist={intelligence.watchlist} />
             </>
           )}
 

@@ -10,6 +10,47 @@ import {
 } from "../../../data/mockData";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { Redis } from "@upstash/redis";
+
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
+
+const REDIS_NEWS_KEY = "lendingiq:news:archive";
+const ARCHIVE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+async function loadNewsArchive() {
+  if (!redis) return [];
+  try {
+    const data = await redis.get(REDIS_NEWS_KEY);
+    if (!Array.isArray(data)) return [];
+    const cutoff = Date.now() - ARCHIVE_TTL_MS;
+    return data.filter((item) => item.publishedTs && item.publishedTs > cutoff);
+  } catch {
+    return [];
+  }
+}
+
+async function saveNewsArchive(freshItems) {
+  if (!redis) return;
+  try {
+    const existing = await loadNewsArchive();
+    const seenIds = new Set();
+    const merged = [...freshItems, ...existing].filter((item) => {
+      if (!item.id || seenIds.has(item.id)) return false;
+      seenIds.add(item.id);
+      const cutoff = Date.now() - ARCHIVE_TTL_MS;
+      return item.publishedTs && item.publishedTs > cutoff;
+    });
+    // Store for 25h (Redis TTL) so we never lose items mid-window
+    await redis.set(REDIS_NEWS_KEY, merged, { ex: 25 * 60 * 60 });
+  } catch {
+    // fail silently — fresh items still served
+  }
+}
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,7 +58,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 8;
 
 const RSS_FEEDS = [
   {
@@ -252,6 +293,211 @@ const NEWS_APIS = [
   },
 ];
 
+// ── Exchange Filings (BSE + NSE) ──────────────────────────────────────────────
+// Map of BSE scrip code → company name for BFSI sector companies.
+// Used to filter the broad BSE announcement feed down to financial services only.
+const BSE_BFSI_CODES = {
+  // Banks
+  "500180": "HDFC Bank", "532174": "ICICI Bank", "500112": "SBI",
+  "532215": "Axis Bank", "500247": "Kotak Mahindra Bank", "532187": "IndusInd Bank",
+  "532648": "Yes Bank", "500469": "Federal Bank", "539437": "IDFC First Bank",
+  "540065": "RBL Bank", "532218": "South Indian Bank", "532210": "City Union Bank",
+  "532772": "DCB Bank", "590003": "Karur Vysya Bank", "532652": "Karnataka Bank",
+  "532343": "Bank of India", "532525": "Union Bank", "532483": "Canara Bank",
+  "532461": "Bank of Baroda", "532149": "Punjab National Bank",
+  // NBFCs
+  "532978": "Bajaj Finance", "511218": "Shriram Finance", "533398": "Muthoot Finance",
+  "531213": "Manappuram Finance", "511243": "Cholamandalam Investment",
+  "532636": "IIFL Finance", "533519": "L&T Finance", "533260": "Poonawalla Fincorp",
+  "543948": "Five Star Business Finance", "511742": "Ugro Capital",
+  "543335": "Aptus Value Housing", "541988": "Aavas Financiers",
+  "543259": "Home First Finance", "535322": "Repco Home Finance",
+  "532720": "Mahindra Finance", "590071": "Sundaram Finance",
+  "544002": "Muthoot Microfin",
+  // HFCs
+  "500253": "LIC Housing Finance", "540173": "PNB Housing Finance",
+  "511196": "Can Fin Homes", "535789": "Indiabulls Housing Finance",
+  // MFIs & Small Finance Banks
+  "541770": "CreditAccess Grameen", "542759": "Spandana Sphoorty",
+  "543652": "Fusion Microfinance", "543540": "Jana Small Finance Bank",
+  "543243": "Equitas Small Finance Bank", "544067": "ESAF Small Finance Bank",
+  "542904": "Ujjivan Small Finance Bank", "540611": "AU Small Finance Bank",
+  // AMCs & Insurance
+  "541729": "HDFC AMC", "540767": "Nippon India AMC", "543238": "UTI AMC",
+  "540133": "ICICI Prudential Life", "540719": "SBI Life",
+  "540777": "HDFC Life", "543347": "Star Health", "500271": "Max Financial",
+  // Rating Agencies & Others
+  "500092": "CRISIL", "532835": "ICRA", "534804": "CARE Ratings",
+  "543396": "Paytm", "543390": "PB Fintech", "543572": "Nuvama Wealth",
+};
+
+// NSE symbols set for the same universe
+const NSE_BFSI_SYMBOLS = new Set([
+  "HDFCBANK","ICICIBANK","SBIN","AXISBANK","KOTAKBANK","INDUSINDBK","YESBANK",
+  "FEDERALBNK","IDFCFIRSTB","RBLBANK","SOUTHBANK","CUB","DCBBANK","KVB","KTKBANK",
+  "BANKBARODA","UNIONBANK","CANBK","PNBHOUSING","PNB",
+  "BAJFINANCE","SHRIRAMFIN","MUTHOOTFIN","MANAPPURAM","CHOLAFIN","IIFL",
+  "LTF","POONAWALLA","FIVESTAR","UGROCAP","APTUS","AAVAS","HOMEFIRST",
+  "REPCO","M&MFIN","SUNDARMFIN","MUTHOOTMF",
+  "LICHSGFIN","PNBHOUSING","CANFINHOME","IBULHSGFIN",
+  "CREDITACC","SPANDANA","FUSION","JSFB","EQUITASBNK","ESAFSFB","UJJIVANSFB","AUBANK",
+  "HDFCAMC","NAM-INDIA","UTIAMC","ICICIPRULI","SBILIFE","HDFCLIFE","STARHEALTH","MFSL",
+  "CRISIL","ICRA","CARERATING","PAYTM","POLICYBZR","NUVAMA",
+]);
+
+function annCategoryToCategory(rawCategory = "") {
+  const cat = rawCategory.toLowerCase();
+  if (cat.includes("result") || cat.includes("financial") || cat.includes("earnings")) return "Policy";
+  if (cat.includes("rating")) return "Credit Rating";
+  if (cat.includes("board meeting") || cat.includes("board of directors")) return "Policy";
+  if (cat.includes("ncd") || cat.includes("debenture") || cat.includes("bond") ||
+      cat.includes("qip") || cat.includes("ipo") || cat.includes("rights") ||
+      cat.includes("fundrais") || cat.includes("allotment")) return "Fundraise";
+  if (cat.includes("regulation") || cat.includes("rbi") || cat.includes("sebi") ||
+      cat.includes("penalty") || cat.includes("compliance")) return "Regulation";
+  if (cat.includes("merger") || cat.includes("acquisition") || cat.includes("amalgamation") ||
+      cat.includes("joint venture") || cat.includes("agreement")) return "Partnership";
+  if (cat.includes("litigation") || cat.includes("fraud") || cat.includes("npa") ||
+      cat.includes("default") || cat.includes("insolvency")) return "Risk Signal";
+  return "Policy";
+}
+
+async function fetchBseAnnouncements() {
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - 1);
+  const fmt = (d) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+
+  const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?strCat=-1&strPrevDate=${fmt(from)}&strScrip=&strSearch=P&strToDate=${fmt(today)}&strType=C&subcategory=-1`;
+
+  try {
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-IN,en;q=0.9",
+        "Origin": "https://www.bseindia.com",
+        "Referer": "https://www.bseindia.com/",
+      },
+    }, 8000);
+    if (!res.ok) throw new Error(`BSE API returned ${res.status}`);
+    const json = await res.json();
+    const rows = json?.Table || json?.data || [];
+    return rows
+      .filter((r) => BSE_BFSI_CODES[String(r.SCRIP_CD || r.scrip_cd || "")])
+      .map((r, i) => {
+        const scripCode = String(r.SCRIP_CD || r.scrip_cd || "");
+        const company = BSE_BFSI_CODES[scripCode] || r.SLONGNAME || r.COMP_NAME || "";
+        const headline = r.HEADLINE || r.headline || r.subject || "";
+        const category = annCategoryToCategory(r.CATEGORYNAME || r.category || "");
+        const dt = r.DT_TM || r.NEWS_DT || r.dt || "";
+        const attachmentFile = r.ATTACHMENTNAME || r.attachmentname || "";
+        const annUrl = attachmentFile
+          ? `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${attachmentFile}`
+          : `https://www.bseindia.com/corporates/ann.aspx?scripcode=${scripCode}`;
+
+        return {
+          id: `BSE-${scripCode}-${hashText(headline)}-${i}`,
+          time: relativeTime(dt),
+          source: "BSE",
+          segment: classifySegment(`${company} ${headline}`, category),
+          category,
+          headline: `[${company}] ${headline}`,
+          tldr: `BSE exchange filing — ${r.CATEGORYNAME || "Corporate Announcement"}`,
+          whyMatters: buildWhyMatters(category, "BSE"),
+          impactNBFC: "Medium",
+          impactDigital: "Low",
+          impactInvestor: "High",
+          tags: ["Exchange Filing", "BSE", company, category],
+          risk: category === "Risk Signal" ? "High" : "Low",
+          trending: false,
+          url: annUrl,
+          publishedAt: dt,
+          publishedTs: dt ? new Date(dt).getTime() || 0 : 0,
+          sourceTier: "primary",
+          sourceType: "exchange_filing",
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchNseAnnouncements() {
+  try {
+    // Step 1: hit NSE homepage to get session cookies
+    const homeRes = await fetchWithTimeout("https://www.nseindia.com/", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-IN,en;q=0.9",
+      },
+    }, 6000);
+    const cookies = (homeRes.headers.get("set-cookie") || "")
+      .split(",")
+      .map((c) => c.split(";")[0].trim())
+      .filter(Boolean)
+      .join("; ");
+
+    // Step 2: fetch announcements with cookies
+    const res = await fetchWithTimeout(
+      "https://www.nseindia.com/api/corporate-announcements?index=equities",
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "en-IN,en;q=0.9",
+          "Referer": "https://www.nseindia.com/companies-listing/corporate-filings-announcements",
+          "Cookie": cookies,
+        },
+      },
+      8000
+    );
+    if (!res.ok) throw new Error(`NSE API returned ${res.status}`);
+    const json = await res.json();
+    const rows = Array.isArray(json) ? json : (json?.data || []);
+    return rows
+      .filter((r) => NSE_BFSI_SYMBOLS.has(r.symbol || r.smSymbol || ""))
+      .slice(0, 50)
+      .map((r, i) => {
+        const symbol = r.symbol || r.smSymbol || "";
+        const company = r.comp || r.smCompanyName || symbol;
+        const headline = r.subject || r.desc || "";
+        const category = annCategoryToCategory(r.bflag || r.an_type || "");
+        const dt = r.an_dt || r.sort_date || "";
+        const attachmentFile = r.attchmntFile || "";
+        const annUrl = attachmentFile
+          ? `https://nsearchives.nseindia.com/corporate/ann/${attachmentFile}`
+          : `https://www.nseindia.com/companies-listing/corporate-filings-announcements`;
+
+        return {
+          id: `NSE-${symbol}-${hashText(headline)}-${i}`,
+          time: relativeTime(dt),
+          source: "NSE",
+          segment: classifySegment(`${company} ${headline}`, category),
+          category,
+          headline: `[${company}] ${headline}`,
+          tldr: `NSE exchange filing — ${r.bflag || r.an_type || "Corporate Announcement"}`,
+          whyMatters: buildWhyMatters(category, "NSE"),
+          impactNBFC: "Medium",
+          impactDigital: "Low",
+          impactInvestor: "High",
+          tags: ["Exchange Filing", "NSE", company, category],
+          risk: category === "Risk Signal" ? "High" : "Low",
+          trending: false,
+          url: annUrl,
+          publishedAt: dt,
+          publishedTs: dt ? new Date(dt).getTime() || 0 : 0,
+          sourceTier: "primary",
+          sourceType: "exchange_filing",
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -394,6 +640,8 @@ const RELEVANCE_WORDS = [
 ];
 
 const SOURCE_WEIGHTS = {
+  BSE: 42,
+  NSE: 42,
   RBI: 40,
   SEBI: 38,
   "ET BFSI": 24,
@@ -1300,57 +1548,105 @@ async function fetchGlobalData() {
   return indicators;
 }
 
-function buildAISummary(newsItems, ratingChanges) {
-  if (!newsItems.length) return null;
+const BUCKET_CONNECTORS = {
+  Regulation: "On the regulatory front",
+  "Risk Signal": "Risk alert",
+  "Credit Rating": "In credit markets",
+  Fundraise: "On the capital side",
+  Partnership: "In partnership activity",
+  Policy: "Policy update",
+  "AI & Tech": "In fintech and technology",
+};
 
-  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
-  const total = newsItems.length;
-  const fresh = newsItems.filter((i) => i.publishedTs && Date.now() - i.publishedTs < 6 * 60 * 60 * 1000).length;
-
-  const segCounts = {};
-  newsItems.forEach((i) => { segCounts[i.segment] = (segCounts[i.segment] || 0) + 1; });
-  const topSeg = Object.entries(segCounts).sort((a, b) => b[1] - a[1])[0];
-
-  const topReg = newsItems.find((i) => i.category === "Regulation");
-  const highRisk = newsItems.filter((i) => i.risk === "High");
-  const topFundraise = newsItems.find((i) => i.category === "Fundraise");
-  const topAI = newsItems.find((i) => i.segment === "AI & Tech");
-  const downgrades = ratingChanges.filter((r) => r.direction === "down");
-  const upgrades = ratingChanges.filter((r) => r.direction === "up");
-
-  const clip = (text, max = 85) => text.length > max ? `${text.slice(0, max)}…` : text;
+function buildBucketNarrative(items) {
+  if (!items.length) return null;
+  const top = [...items].sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 8);
+  const byCategory = {};
+  top.forEach((item) => {
+    if (!byCategory[item.category]) byCategory[item.category] = [];
+    byCategory[item.category].push(item);
+  });
 
   const sentences = [];
-  sentences.push(`${total} stories tracked across Indian financial services on ${today}${fresh > 0 ? `, with ${fresh} fresh in the last 6 hours` : ""}.`);
+  const used = new Set();
+  const clip = (text, max = 95) => text && text.length > max ? `${text.slice(0, max)}…` : text;
+  const priorityOrder = ["Regulation", "Risk Signal", "Credit Rating", "Fundraise", "Partnership", "Policy", "AI & Tech"];
 
-  if (topSeg && topSeg[1] > 2) sentences.push(`${topSeg[0]} led coverage with ${topSeg[1]} stories.`);
-  if (topReg) sentences.push(`Regulatory spotlight: ${clip(topReg.headline)}.`);
-  if (highRisk.length) sentences.push(`${highRisk.length} high-risk signal${highRisk.length > 1 ? "s" : ""} flagged — ${clip(highRisk[0].headline)}.`);
+  for (const cat of priorityOrder) {
+    const catItems = (byCategory[cat] || []).filter((i) => !used.has(i.id));
+    if (!catItems.length) continue;
 
-  if (downgrades.length) {
-    sentences.push(`Credit alert: ${downgrades.slice(0, 2).map((d) => d.entity).join(", ")} downgraded.`);
-  } else if (upgrades.length) {
-    sentences.push(`Positive rating momentum: ${upgrades.slice(0, 2).map((u) => u.entity).join(", ")} upgraded.`);
+    const item = catItems[0];
+    const connector = BUCKET_CONNECTORS[cat] || "Update";
+    const tldrExtra = item.tldr && item.tldr !== item.headline && item.tldr.length > 20
+      ? ` ${clip(item.tldr, 80)}`
+      : "";
+    sentences.push(`${connector}: ${clip(item.headline)}${tldrExtra ? " —" + tldrExtra : ""}.`);
+    used.add(item.id);
+
+    if (catItems.length > 1) {
+      const second = catItems[1];
+      sentences.push(`Separately, ${clip(second.headline)}.`);
+      used.add(second.id);
+    }
+    if (catItems.length > 2) {
+      sentences.push(`${catItems.length - 2} more ${cat.toLowerCase()} item${catItems.length - 2 > 1 ? "s" : ""} in the feed.`);
+    }
+    if (sentences.length >= 5) break;
   }
 
-  if (topFundraise) sentences.push(`Capital activity: ${clip(topFundraise.headline)}.`);
-  if (topAI) sentences.push(`Tech signal: ${clip(topAI.headline)}.`);
+  const remaining = top.filter((i) => !used.has(i.id)).slice(0, 2);
+  remaining.forEach((item) => { sentences.push(`Also: ${clip(item.headline)}.`); });
 
   return sentences.join(" ");
 }
 
+function buildTimeBuckets(newsItems) {
+  const now = Date.now();
+  const BUCKETS = [
+    { label: "Last 1 hour", icon: "⚡", min: 0, max: 60 },
+    { label: "1–2 hours ago", icon: "🔔", min: 60, max: 120 },
+    { label: "2–6 hours ago", icon: "📰", min: 120, max: 360 },
+    { label: "6–12 hours ago", icon: "🗂", min: 360, max: 720 },
+  ];
+
+  return BUCKETS.map((bucket) => {
+    const items = newsItems
+      .filter((item) => {
+        if (!item.publishedTs) return false;
+        const ageMin = (now - item.publishedTs) / 60000;
+        return ageMin >= bucket.min && ageMin < bucket.max;
+      })
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    if (!items.length) return null;
+
+    return {
+      label: bucket.label,
+      icon: bucket.icon,
+      count: items.length,
+      summary: buildBucketNarrative(items),
+      topItems: items.slice(0, 5).map((i) => ({
+        id: i.id,
+        headline: i.headline,
+        tldr: i.tldr,
+        source: i.source,
+        category: i.category,
+        risk: i.risk,
+        url: i.url,
+        time: i.time,
+        segment: i.segment,
+      })),
+    };
+  }).filter(Boolean);
+}
+
 function buildDailyBrief(newsItems, ratingChanges) {
-  const highRisk = newsItems.find((item) => item.risk === "High");
-  const regulation = newsItems.find((item) => item.category === "Regulation");
-  const rating = ratingChanges[0];
+  const downgrades = ratingChanges.filter((r) => r.direction === "down");
+  const upgrades = ratingChanges.filter((r) => r.direction === "up");
 
   return {
-    aiSummary: buildAISummary(newsItems, ratingChanges),
-    marketPulse: [
-      regulation?.headline,
-      highRisk?.headline,
-      rating ? `${rating.entity} rating signal from ${rating.agency}` : null,
-    ].filter(Boolean).join(" "),
+    timeBuckets: buildTimeBuckets(newsItems),
     riskSignals: newsItems
       .filter((item) => item.risk === "High" || item.category === "Risk Signal")
       .slice(0, 3)
@@ -1359,6 +1655,10 @@ function buildDailyBrief(newsItems, ratingChanges) {
       .filter((item) => ["Fundraise", "Partnership", "Policy", "AI & Tech"].includes(item.category))
       .slice(0, 3)
       .map((item) => item.headline),
+    ratingSnapshot: {
+      downgrades: downgrades.slice(0, 3).map((r) => ({ entity: r.entity, from: r.from, to: r.to, agency: r.agency })),
+      upgrades: upgrades.slice(0, 3).map((r) => ({ entity: r.entity, from: r.from, to: r.to, agency: r.agency })),
+    },
   };
 }
 
@@ -1435,11 +1735,14 @@ function buildGovtSchemes(newsItems) {
 }
 
 async function buildIntelligencePayload() {
-    const [rssNewsResult, gdeltNewsResult, marketResult, globalResult] = await Promise.allSettled([
+    const [rssNewsResult, gdeltNewsResult, marketResult, globalResult, archivedItems, bseResult, nseResult] = await Promise.allSettled([
       fetchRssNews(),
       fetchGdeltNews(),
       fetchMarketData(),
       fetchGlobalData(),
+      loadNewsArchive(),
+      fetchBseAnnouncements(),
+      fetchNseAnnouncements(),
     ]);
 
     const rssItems = rssNewsResult.status === "fulfilled" ? rssNewsResult.value.items : [];
@@ -1453,7 +1756,19 @@ async function buildIntelligencePayload() {
           error: rssNewsResult.reason?.message || "RSS refresh failed",
         }));
     const gdeltItems = gdeltNewsResult.status === "fulfilled" ? gdeltNewsResult.value : [];
-    const dedupedNews = dedupeAndRankNews([...rssItems, ...gdeltItems]);
+    const bseItems = bseResult.status === "fulfilled" ? bseResult.value : [];
+    const nseItems = nseResult.status === "fulfilled" ? nseResult.value : [];
+    const freshDeduped = dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...gdeltItems]);
+
+    // Merge fresh news with 24h archive from Redis
+    const archive = archivedItems.status === "fulfilled" ? archivedItems.value : [];
+    const dedupedNews = freshDeduped.length
+      ? dedupeAndRankNews([...freshDeduped, ...archive])
+      : archive;
+
+    // Persist merged set back to Redis (fire-and-forget)
+    if (freshDeduped.length) saveNewsArchive(freshDeduped);
+
     const newsItems = dedupedNews.length
       ? dedupedNews
       : NEWS_ITEMS;

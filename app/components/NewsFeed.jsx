@@ -159,11 +159,12 @@ function itemText(item) {
 
 function itemMatchesSegment(item, segment) {
   if (segment === "All") return true;
+  if (segment === "Exchange Filings") return item.sourceType === "exchange_filing";
   if (item.segment === segment) return true;
   const text = itemText(item);
 
   if (segment === "Others") {
-    return !["NBFCs", "Digital Lenders", "Banks", "AI & Tech"].some((group) => itemMatchesSegment(item, group));
+    return !["NBFCs", "Digital Lenders", "Banks", "AI & Tech", "Exchange Filings"].some((group) => itemMatchesSegment(item, group));
   }
 
   return (SEGMENT_KEYWORDS[segment] || []).some((keyword) => text.includes(keyword));
@@ -296,7 +297,12 @@ export default function NewsFeed({
           >
             {/* Row 1 — meta */}
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <Tag label={item.source} color="var(--accent-blue)" />
+              <Tag label={item.source} color={item.sourceType === "exchange_filing" ? "#8B6FBF" : "var(--accent-blue)"} />
+              {item.sourceType === "exchange_filing" && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-mono" style={{ background: "rgba(139,111,191,0.15)", color: "#8B6FBF" }}>
+                  Filing
+                </span>
+              )}
               <Tag label={item.category} color={getCategoryColor(item.category)} />
               {item.trending && <Flame size={12} className="text-[var(--accent-amber)]" />}
               {isNew(item.publishedTs) && (

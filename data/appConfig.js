@@ -1,5 +1,6 @@
 export const FILTER_OPTIONS = [
   "All",
+  "Exchange Filings",
   "NBFCs",
   "Digital Lenders",
   "Banks",

@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 
 const RSS_FEEDS = [
   {
@@ -232,6 +232,17 @@ const RSS_FEEDS = [
     url: "https://economictimes.indiatimes.com/tech/rssfeeds/13357270.cms",
     defaultCategory: "AI & Tech",
   },
+  // Stock market / corporate results (medium priority)
+  {
+    source: "Google News NBFC Results",
+    url: "https://news.google.com/rss/search?q=%28%22quarterly%20results%22%20OR%20%22Q4%20results%22%20OR%20%22Q3%20results%22%20OR%20earnings%20OR%20%22net%20profit%22%29%20%28NBFC%20OR%20%22Bajaj%20Finance%22%20OR%20%22Shriram%20Finance%22%20OR%20%22Cholamandalam%22%20OR%20%22Muthoot%22%20OR%20%22digital%20lender%22%29%20India%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News FS Fundraise",
+    url: "https://news.google.com/rss/search?q=%28%22series%20A%22%20OR%20%22series%20B%22%20OR%20%22series%20C%22%20OR%20%22funding%20round%22%20OR%20%22raises%22%20OR%20QIP%20OR%20IPO%20OR%20%22stake%20sale%22%29%20%28fintech%20OR%20NBFC%20OR%20%22digital%20lending%22%20OR%20%22lending%20platform%22%29%20India%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
 ];
 
 const NEWS_APIS = [
@@ -351,10 +362,11 @@ const CATEGORY_KEYWORDS = [
 ];
 
 const RELEVANCE_WORDS = [
+  // Core FS
   "nbfc", "lending", "loan", "credit", "bank", "finance", "fintech", "rbi", "sebi",
   "ncd", "msme", "co-lending", "rating", "debt", "bond", "asset quality", "npa",
   "mfi", "microfinance", "hfc", "housing finance", "sidbi", "nhb", "pib",
-  // digital lenders
+  // Digital lenders
   "digital lender", "kreditbee", "moneyview", "kissht", "navi", "fibe", "stashfin",
   "cashe", "lazypay", "simpl", "lendingkart", "flexiloans", "indifi", "neogrowth",
   "oxyzo", "mintifi", "progcap", "yubi", "credavenue", "northern arc", "vivriti",
@@ -367,6 +379,18 @@ const RELEVANCE_WORDS = [
   "ekyc", "video kyc", "digital kyc", "credit scoring model", "underwriting model",
   "digital rupee", "cbdc", "upi credit", "ondc", "open banking", "aa framework",
   "fintech technology", "machine learning", "automation", "ai fintech",
+  // Stock market / corporate (medium priority — captured but ranked lower)
+  "quarterly results", "q4 results", "q3 results", "q2 results", "q1 results",
+  "net profit", "roe", "roa", "net interest margin", "nim", "gnpa", "book value",
+  "ipo", "qip", "rights issue", "fundraise", "series a", "series b", "series c",
+  "valuation", "stake sale", "merger", "acquisition", "amalgamation",
+  "dividend", "buyback", "promoter", "shareholding", "fii", "dii",
+  "nse", "bse", "sensex", "nifty", "stock", "shares", "market cap",
+  // Broader FS signals
+  "partnership", "tie-up", "collaboration", "joint venture",
+  "liquidity", "capital adequacy", "car", "tier 1", "tier 2",
+  "provisioning", "write-off", "recovery", "collection",
+  "interest income", "net income", "disbursement", "aum",
 ];
 
 const SOURCE_WEIGHTS = {
@@ -407,6 +431,8 @@ const SOURCE_WEIGHTS = {
   "Google News Digital Rupee": 20,
   Entrackr: 18,
   "ET Tech": 20,
+  "Google News NBFC Results": 14,
+  "Google News FS Fundraise": 14,
 };
 
 const CATEGORY_WEIGHTS = {
@@ -676,7 +702,17 @@ function toNewsItem(item, index) {
     impactInvestor: impact.investor,
     tags: [...new Set(tags)],
     risk,
-    trending: risk === "High" || category === "Regulation",
+    trending: (() => {
+      const ageHours = item.publishedAt ? Math.max(0, (Date.now() - new Date(item.publishedAt).getTime()) / 3600000) : 72;
+      const score =
+        (risk === "High" ? 3 : 0) +
+        (category === "Regulation" ? 2 : 0) +
+        (category === "Credit Rating" ? 2 : 0) +
+        (category === "Risk Signal" ? 2 : 0) +
+        (["RBI", "SEBI", "PIB"].includes(item.source) ? 2 : 0) +
+        (ageHours < 6 ? 1 : 0);
+      return score >= 3;
+    })(),
     url: item.link,
     publishedAt: item.publishedAt,
     publishedTs: publishedTime(item),
@@ -1264,12 +1300,52 @@ async function fetchGlobalData() {
   return indicators;
 }
 
+function buildAISummary(newsItems, ratingChanges) {
+  if (!newsItems.length) return null;
+
+  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+  const total = newsItems.length;
+  const fresh = newsItems.filter((i) => i.publishedTs && Date.now() - i.publishedTs < 6 * 60 * 60 * 1000).length;
+
+  const segCounts = {};
+  newsItems.forEach((i) => { segCounts[i.segment] = (segCounts[i.segment] || 0) + 1; });
+  const topSeg = Object.entries(segCounts).sort((a, b) => b[1] - a[1])[0];
+
+  const topReg = newsItems.find((i) => i.category === "Regulation");
+  const highRisk = newsItems.filter((i) => i.risk === "High");
+  const topFundraise = newsItems.find((i) => i.category === "Fundraise");
+  const topAI = newsItems.find((i) => i.segment === "AI & Tech");
+  const downgrades = ratingChanges.filter((r) => r.direction === "down");
+  const upgrades = ratingChanges.filter((r) => r.direction === "up");
+
+  const clip = (text, max = 85) => text.length > max ? `${text.slice(0, max)}…` : text;
+
+  const sentences = [];
+  sentences.push(`${total} stories tracked across Indian financial services on ${today}${fresh > 0 ? `, with ${fresh} fresh in the last 6 hours` : ""}.`);
+
+  if (topSeg && topSeg[1] > 2) sentences.push(`${topSeg[0]} led coverage with ${topSeg[1]} stories.`);
+  if (topReg) sentences.push(`Regulatory spotlight: ${clip(topReg.headline)}.`);
+  if (highRisk.length) sentences.push(`${highRisk.length} high-risk signal${highRisk.length > 1 ? "s" : ""} flagged — ${clip(highRisk[0].headline)}.`);
+
+  if (downgrades.length) {
+    sentences.push(`Credit alert: ${downgrades.slice(0, 2).map((d) => d.entity).join(", ")} downgraded.`);
+  } else if (upgrades.length) {
+    sentences.push(`Positive rating momentum: ${upgrades.slice(0, 2).map((u) => u.entity).join(", ")} upgraded.`);
+  }
+
+  if (topFundraise) sentences.push(`Capital activity: ${clip(topFundraise.headline)}.`);
+  if (topAI) sentences.push(`Tech signal: ${clip(topAI.headline)}.`);
+
+  return sentences.join(" ");
+}
+
 function buildDailyBrief(newsItems, ratingChanges) {
   const highRisk = newsItems.find((item) => item.risk === "High");
   const regulation = newsItems.find((item) => item.category === "Regulation");
   const rating = ratingChanges[0];
 
   return {
+    aiSummary: buildAISummary(newsItems, ratingChanges),
     marketPulse: [
       regulation?.headline,
       highRisk?.headline,
@@ -1287,18 +1363,28 @@ function buildDailyBrief(newsItems, ratingChanges) {
 }
 
 function buildCoLendingData(newsItems) {
+  const CO_KEYWORDS = [
+    "co-lending", "co lending", "colending", "partnership", "tie-up", "tieup",
+    "joint lending", "psl", "priority sector", "bank-nbfc", "nbfc-bank",
+    "collaboration", "joint venture", "co-origination",
+  ];
   return newsItems
-    .filter((item) => item.category === "Partnership" || item.headline.toLowerCase().includes("co-lending"))
-    .slice(0, 8)
+    .filter((item) => {
+      const text = `${item.headline} ${item.tldr}`.toLowerCase();
+      return item.category === "Partnership" || CO_KEYWORDS.some((kw) => text.includes(kw));
+    })
+    .slice(0, 10)
     .map((item) => ({
       bank: item.source,
-      nbfc: item.headline.split(/ with | partners? | tie-up |:/i)[1]?.slice(0, 44) || "NBFC / lending partner",
+      nbfc: item.headline.split(/ with | partners? | tie-up | tieup |:/i)[1]?.slice(0, 50) || "NBFC / lending partner",
       segment: item.tags?.find((tag) => !["Partnership", item.source].includes(tag)) || "Lending",
       volume: "Reported",
       status: item.time === "Just now" || item.time.includes("m ago") || item.time.includes("h ago") ? "New" : "Active",
       startDate: item.time,
       geography: "India",
       headline: item.headline,
+      tldr: item.tldr,
+      url: item.url,
     }));
 }
 

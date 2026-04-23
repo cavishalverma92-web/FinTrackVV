@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, TrendingUp, Zap, Star, BarChart2 } from "lucide-react";
+import { AlertTriangle, TrendingUp, Zap, Star, BarChart2, Sparkles } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -157,6 +157,21 @@ export default function DailyBrief({
             <span className="text-[10px] text-[var(--text-dim)] font-mono ml-auto">Refreshing…</span>
           )}
         </div>
+
+        {/* ── AI Summary ── */}
+        {brief?.aiSummary && (
+          <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] mb-6" style={{ borderLeftWidth: "3px", borderLeftColor: "#8B6FBF" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles size={12} style={{ color: "#8B6FBF" }} />
+              <p className="text-[10px] font-bold uppercase tracking-widest font-mono" style={{ color: "#8B6FBF" }}>
+                Today's Intelligence Summary
+              </p>
+            </div>
+            <p className="text-[13px] text-[var(--text-primary)] leading-relaxed">
+              {brief.aiSummary}
+            </p>
+          </div>
+        )}
 
         {/* ── Segment Heat Bar ── */}
         {newsItems.length > 0 && (

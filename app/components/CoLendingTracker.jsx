@@ -7,7 +7,7 @@
 
 "use client";
 
-import { ArrowRight, MapPin } from "lucide-react";
+import { ArrowRight, MapPin, ExternalLink } from "lucide-react";
 
 // Status color helper
 function statusStyle(status) {
@@ -95,6 +95,13 @@ export default function CoLendingTracker({ coLendingData = [] }) {
                 </span>
               </div>
 
+              {/* tldr */}
+              {deal.tldr && deal.tldr !== deal.headline && (
+                <p className="text-[11px] text-[var(--text-dim)] leading-relaxed mb-3 line-clamp-2">
+                  {deal.tldr}
+                </p>
+              )}
+
               {/* Details row */}
               <div className="flex items-center gap-6 flex-wrap text-[11px] text-[var(--text-dim)]">
                 <div>
@@ -113,6 +120,16 @@ export default function CoLendingTracker({ coLendingData = [] }) {
                   <MapPin size={10} />
                   <span className="text-[var(--text-secondary)]">{deal.geography}</span>
                 </div>
+                {deal.url && (
+                  <a
+                    href={deal.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-blue)] hover:underline"
+                  >
+                    Read <ExternalLink size={10} />
+                  </a>
+                )}
               </div>
             </div>
           );

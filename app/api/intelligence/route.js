@@ -362,6 +362,27 @@ function annCategoryToCategory(rawCategory = "") {
   return "Policy";
 }
 
+function filingRawCategory(...values) {
+  return values
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function filingTitle(company, headline) {
+  const normalizedCompany = String(company || "").trim();
+  const normalizedHeadline = String(headline || "").trim();
+  if (!normalizedCompany) return normalizedHeadline;
+  if (!normalizedHeadline) return normalizedCompany;
+  return `[${normalizedCompany}] ${normalizedHeadline}`;
+}
+
+function filingDedupeKey(exchange, company, headline, publishedAt) {
+  const normalizedTitle = normalizeHeadline(`${company} ${headline}`);
+  const normalizedDate = parseDateValue(publishedAt)?.toISOString()?.slice(0, 16) || "na";
+  return `${exchange}:${normalizedTitle}:${normalizedDate}`;
+}
+
 async function fetchBseAnnouncements() {
   const today = new Date();
   const from = new Date(today);
@@ -389,20 +410,24 @@ async function fetchBseAnnouncements() {
         const scripCode = String(r.SCRIP_CD || r.scrip_cd || "");
         const company = BSE_BFSI_CODES[scripCode] || r.SLONGNAME || r.COMP_NAME || "";
         const headline = r.HEADLINE || r.headline || r.subject || "";
-        const category = annCategoryToCategory(r.CATEGORYNAME || r.category || "");
+        const rawCategory = filingRawCategory(r.CATEGORYNAME, r.category, r.SUBCATNAME, r.SUBCAT, r.HEADLINE);
+        const category = annCategoryToCategory(rawCategory);
         const dt = r.DT_TM || r.NEWS_DT || r.dt || "";
         const attachmentFile = r.ATTACHMENTNAME || r.attachmentname || "";
         const annUrl = attachmentFile
           ? `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${attachmentFile}`
           : `https://www.bseindia.com/corporates/ann.aspx?scripcode=${scripCode}`;
+        const title = filingTitle(company, headline);
 
         return {
-          id: `BSE-${scripCode}-${hashText(headline)}-${i}`,
+          id: `BSE-${scripCode}-${hashText(`${title}-${dt}`)}-${i}`,
           time: relativeTime(dt),
           source: "BSE",
+          exchange: "BSE",
+          company,
           segment: classifySegment(`${company} ${headline}`, category),
           category,
-          headline: `[${company}] ${headline}`,
+          headline: title,
           tldr: `BSE exchange filing — ${r.CATEGORYNAME || "Corporate Announcement"}`,
           whyMatters: buildWhyMatters(category, "BSE"),
           impactNBFC: "Medium",
@@ -414,12 +439,14 @@ async function fetchBseAnnouncements() {
           url: annUrl,
           publishedAt: dt,
           publishedTs: dt ? new Date(dt).getTime() || 0 : 0,
+          filingCategory: rawCategory || "Corporate Announcement",
+          dedupeKey: filingDedupeKey("filing", company, headline, dt),
           sourceTier: "primary",
           sourceType: "exchange_filing",
         };
       });
-  } catch {
-    return [];
+  } catch (error) {
+    throw new Error(`BSE filings failed: ${error.message}`);
   }
 }
 
@@ -458,25 +485,28 @@ async function fetchNseAnnouncements() {
     const rows = Array.isArray(json) ? json : (json?.data || []);
     return rows
       .filter((r) => NSE_BFSI_SYMBOLS.has(r.symbol || r.smSymbol || ""))
-      .slice(0, 50)
       .map((r, i) => {
         const symbol = r.symbol || r.smSymbol || "";
         const company = r.comp || r.smCompanyName || symbol;
         const headline = r.subject || r.desc || "";
-        const category = annCategoryToCategory(r.bflag || r.an_type || "");
+        const rawCategory = filingRawCategory(r.bflag, r.an_type, r.attchmntText, r.subject);
+        const category = annCategoryToCategory(rawCategory);
         const dt = r.an_dt || r.sort_date || "";
         const attachmentFile = r.attchmntFile || "";
         const annUrl = attachmentFile
           ? `https://nsearchives.nseindia.com/corporate/ann/${attachmentFile}`
           : `https://www.nseindia.com/companies-listing/corporate-filings-announcements`;
+        const title = filingTitle(company, headline);
 
         return {
-          id: `NSE-${symbol}-${hashText(headline)}-${i}`,
+          id: `NSE-${symbol}-${hashText(`${title}-${dt}`)}-${i}`,
           time: relativeTime(dt),
           source: "NSE",
+          exchange: "NSE",
+          company,
           segment: classifySegment(`${company} ${headline}`, category),
           category,
-          headline: `[${company}] ${headline}`,
+          headline: title,
           tldr: `NSE exchange filing — ${r.bflag || r.an_type || "Corporate Announcement"}`,
           whyMatters: buildWhyMatters(category, "NSE"),
           impactNBFC: "Medium",
@@ -488,12 +518,14 @@ async function fetchNseAnnouncements() {
           url: annUrl,
           publishedAt: dt,
           publishedTs: dt ? new Date(dt).getTime() || 0 : 0,
+          filingCategory: rawCategory || "Corporate Announcement",
+          dedupeKey: filingDedupeKey("filing", company, headline, dt),
           sourceTier: "primary",
           sourceType: "exchange_filing",
         };
       });
-  } catch {
-    return [];
+  } catch (error) {
+    throw new Error(`NSE filings failed: ${error.message}`);
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1192,6 +1224,7 @@ function dedupeAndRankNews(items) {
 
   for (const item of ranked) {
     const duplicate = deduped.some((candidate) => {
+      if ((candidate.dedupeKey || "") && candidate.dedupeKey === item.dedupeKey) return true;
       if ((candidate.url || "") && candidate.url === item.url) return true;
       return headlineSimilarity(candidate.headline, item.headline) >= 0.72;
     });
@@ -1773,6 +1806,22 @@ async function buildIntelligencePayload() {
       ? dedupedNews
       : NEWS_ITEMS;
     const apiHealth = [
+      {
+        source: "BSE Filings",
+        url: "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w",
+        type: "API",
+        status: bseResult.status === "fulfilled" ? "ok" : "error",
+        itemCount: bseResult.status === "fulfilled" ? bseResult.value.length : 0,
+        error: bseResult.status === "rejected" ? bseResult.reason?.message || "BSE filings failed" : null,
+      },
+      {
+        source: "NSE Filings",
+        url: "https://www.nseindia.com/api/corporate-announcements",
+        type: "API",
+        status: nseResult.status === "fulfilled" ? "ok" : "error",
+        itemCount: nseResult.status === "fulfilled" ? nseResult.value.length : 0,
+        error: nseResult.status === "rejected" ? nseResult.reason?.message || "NSE filings failed" : null,
+      },
       {
         ...NEWS_APIS[0],
         type: "API",

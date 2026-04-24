@@ -63,6 +63,26 @@ export default function NewsDetail({ news }) {
           {news.headline}
         </h2>
 
+        {news.sourceType === "exchange_filing" && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            {news.exchange && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)] font-mono">
+                {news.exchange}
+              </span>
+            )}
+            {news.company && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)] font-mono">
+                {news.company}
+              </span>
+            )}
+            {news.filingCategory && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-primary)] font-mono">
+                {news.filingCategory}
+              </span>
+            )}
+          </div>
+        )}
+
         {news.url && (
           <a
             href={news.url}

@@ -28,11 +28,16 @@ function categoryColor(category) {
   const map = {
     Regulation: "var(--accent-amber)",
     "Credit Rating": "var(--accent-green)",
+    "Ratings / Credit": "var(--accent-green)",
     "Risk Signal": "var(--accent-red)",
+    "Risk Alert": "var(--accent-red)",
+    Penalty: "var(--accent-red)",
     Policy: "#8B6FBF",
     Fundraise: "var(--accent-blue)",
+    "Funding / M&A": "var(--accent-blue)",
     Partnership: "var(--accent-blue)",
     "AI & Tech": "var(--accent-blue)",
+    "Product / Tech": "var(--accent-blue)",
   };
   return map[category] || "var(--text-dim)";
 }

@@ -22,11 +22,18 @@ function getCategoryColor(category) {
   const colors = {
     Regulation: "var(--accent-amber)",
     "Credit Rating": "var(--accent-green)",
+    "Ratings / Credit": "var(--accent-green)",
+    Penalty: "var(--accent-red)",
     Fundraise: "var(--accent-blue)",
+    "Funding / M&A": "var(--accent-blue)",
     Partnership: "var(--accent-blue)",
     "Risk Signal": "var(--accent-red)",
+    "Risk Alert": "var(--accent-red)",
+    Earnings: "var(--accent-green)",
+    "Company Filing": "#8B6FBF",
     Policy: "#8B6FBF",
     "AI & Tech": "var(--accent-blue)",
+    "Product / Tech": "var(--accent-blue)",
   };
   return colors[category] || "var(--text-secondary)";
 }
@@ -35,11 +42,18 @@ function getCategoryClass(category) {
   const map = {
     Regulation: "cat-regulation",
     "Credit Rating": "cat-rating",
+    "Ratings / Credit": "cat-rating",
+    Penalty: "cat-risk",
     Fundraise: "cat-fundraise",
+    "Funding / M&A": "cat-fundraise",
     Partnership: "cat-partnership",
     "Risk Signal": "cat-risk",
+    "Risk Alert": "cat-risk",
+    Earnings: "cat-rating",
+    "Company Filing": "cat-policy",
     Policy: "cat-policy",
     "AI & Tech": "cat-ai",
+    "Product / Tech": "cat-ai",
   };
   return map[category] || "";
 }
@@ -132,6 +146,13 @@ const SEGMENT_KEYWORDS = {
     "nucleus software", "intellect design", "newgen software",
     "fintech technology", "automation in lending", "robo advisor",
   ],
+  HFCs: ["housing finance", "home loan", "hfc", "aavas", "aptus", "home first", "can fin", "lic housing", "pnb housing"],
+  MFIs: ["microfinance", "nbfc-mfi", "mfi", "creditaccess", "spandana", "fusion finance", "muthoot microfin", "arohan"],
+  "Gold Loans": ["gold loan", "muthoot", "manappuram", "rupeek"],
+  "Vehicle Finance": ["vehicle finance", "commercial vehicle", "mahindra finance", "shriram finance"],
+  Payments: ["upi", "payment aggregator", "payments bank", "phonepe", "paytm", "mobikwik", "bharatpe"],
+  Broking: ["zerodha", "groww", "angel one", "broking", "broker"],
+  Insurance: ["insurance", "policybazaar", "pb fintech", "hdfc life", "sbi life", "star health"],
 };
 
 function itemText(item) {
@@ -147,7 +168,7 @@ function itemText(item) {
 function itemMatchesSegment(item, segment) {
   if (segment === "All") return true;
   if (segment === "Exchange Filings") return item.sourceType === "exchange_filing";
-  if (item.segment === segment) return true;
+  if (item.segment === segment || item.sector === segment) return true;
   const text = itemText(item);
 
   if (segment === "Others") {
@@ -163,6 +184,7 @@ export default function NewsFeed({
   dataError,
   updatedAt,
   cache,
+  qualityStats,
   searchQuery = "",
   selectedId,
   onSelectNews,
@@ -200,6 +222,12 @@ export default function NewsFeed({
           {updatedLabel ? ` · Updated ${updatedLabel}` : ""}
           {cache?.servedFromCache ? " · cached" : ""}
         </p>
+
+        {qualityStats?.filteredItems > 0 && (
+          <p className="text-[11px] text-[var(--accent-green)] mt-1">
+            Quality gate filtered {qualityStats.filteredItems} noisy or non-BFSI items from this refresh.
+          </p>
+        )}
 
         {dataStatus === "fallback" && (
           <p className="text-[11px] text-[var(--accent-amber)] mt-1">
@@ -264,6 +292,9 @@ export default function NewsFeed({
                 </span>
               )}
               <Tag label={item.category} color={getCategoryColor(item.category)} />
+              {item.sector && item.sector !== item.segment && (
+                <Tag label={item.sector} color="var(--text-secondary)" />
+              )}
               {item.trending && <Flame size={12} className="text-[var(--accent-amber)]" />}
               {isNew(item.publishedTs) && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[var(--accent-red)] text-white uppercase tracking-wider font-mono">
@@ -288,6 +319,12 @@ export default function NewsFeed({
             </p>
 
             {/* Row 4 — impact + link */}
+            {item.materialityReason && (
+              <p className="text-[10px] text-[var(--text-dim)] leading-relaxed mb-3 font-mono">
+                Why shown: {item.materialityReason}
+              </p>
+            )}
+
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-3">
                 {["impactNBFC", "impactDigital", "impactInvestor"].map((key, i) => {

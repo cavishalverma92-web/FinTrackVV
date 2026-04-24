@@ -31,6 +31,7 @@ const INITIAL_DATA = {
   dailyBrief: null,
   sources: null,
   sourceStats: null,
+  qualityStats: null,
   updatedAt: null,
   cache: null,
 };
@@ -176,6 +177,7 @@ export default function DashboardClient({ initialIntelligence }) {
                   sources={intelligence.sources}
                   updatedAt={intelligence.updatedAt}
                   cache={intelligence.cache}
+                  qualityStats={intelligence.qualityStats}
                   searchQuery={searchQuery}
                   selectedId={selectedNews?.id}
                   onSelectNews={setSelectedNews}
@@ -230,8 +232,9 @@ export default function DashboardClient({ initialIntelligence }) {
           )}
 
           {activeTab === "sources" && (
-            <SourceControl
-              sources={intelligence.sources}
+              <SourceControl
+                sources={intelligence.sources}
+                qualityStats={intelligence.qualityStats}
               updatedAt={intelligence.updatedAt}
               cache={intelligence.cache}
               dataStatus={dataStatus}

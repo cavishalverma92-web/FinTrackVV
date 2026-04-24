@@ -24,17 +24,17 @@ function getRiskRatio(newsItems) {
     (item) =>
       item.risk !== "High" &&
       item.impactNBFC !== "Critical" &&
-      ["Fundraise", "Partnership", "Credit Rating"].includes(item.category)
+      ["Funding / M&A", "Fundraise", "Partnership", "Ratings / Credit", "Credit Rating"].includes(item.category)
   ).length;
   const mood = risks > opportunities ? "caution" : risks === 0 ? "clear" : "balanced";
   return { risks, opportunities, mood };
 }
 
 function getSegmentCounts(newsItems) {
-  const counts = { NBFCs: 0, "Digital Lenders": 0, Banks: 0, "AI & Tech": 0, Others: 0 };
+  const counts = {};
   newsItems.forEach((item) => {
-    if (counts[item.segment] !== undefined) counts[item.segment]++;
-    else counts.Others++;
+    const key = item.sector || item.segment || "Others";
+    counts[key] = (counts[key] || 0) + 1;
   });
   return counts;
 }
@@ -44,6 +44,14 @@ const SEGMENT_COLORS = {
   "Digital Lenders": "var(--accent-blue)",
   Banks: "var(--accent-green)",
   "AI & Tech": "#8B6FBF",
+  HFCs: "var(--accent-amber)",
+  MFIs: "var(--accent-red)",
+  "Gold Loans": "#B7791F",
+  "Vehicle Finance": "#5EA7EF",
+  Payments: "var(--accent-blue)",
+  Broking: "var(--accent-green)",
+  Insurance: "#8B6FBF",
+  "Fintech Infra": "#8B6FBF",
   Others: "var(--text-dim)",
 };
 
@@ -129,7 +137,7 @@ export default function DailyBrief({
   const opportunityItems = Array.isArray(brief?.opportunities) && brief.opportunities.length
     ? brief.opportunities
     : newsItems
-        .filter((item) => item.risk !== "High" && ["Fundraise", "Partnership"].includes(item.category))
+        .filter((item) => item.risk !== "High" && ["Funding / M&A", "Fundraise", "Partnership"].includes(item.category))
         .slice(0, 4)
         .map((item) => item.headline);
 
@@ -178,7 +186,7 @@ export default function DailyBrief({
                 .map(([seg, count]) => (
                   <div
                     key={seg}
-                    style={{ width: `${(count / totalSegment) * 100}%`, backgroundColor: SEGMENT_COLORS[seg] }}
+                    style={{ width: `${(count / totalSegment) * 100}%`, backgroundColor: SEGMENT_COLORS[seg] || SEGMENT_COLORS.Others }}
                     title={`${seg}: ${count}`}
                   />
                 ))}
@@ -189,7 +197,7 @@ export default function DailyBrief({
                 .sort(([, a], [, b]) => b - a)
                 .map(([seg, count]) => (
                   <span key={seg} className="flex items-center gap-1.5 text-[10px] font-mono">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: SEGMENT_COLORS[seg] }} />
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: SEGMENT_COLORS[seg] || SEGMENT_COLORS.Others }} />
                     <span className="text-[var(--text-dim)]">{seg}</span>
                     <span className="font-bold text-[var(--text-secondary)]">{count}</span>
                   </span>
@@ -402,6 +410,11 @@ function TopItem({ item, onSelectNews }) {
             </span>
           )}
         </div>
+        {item.materialityReason && (
+          <p className="text-[10px] text-[var(--text-dim)] leading-snug mt-1 font-mono">
+            {item.materialityReason}
+          </p>
+        )}
       </div>
       {item.url && (
         <a

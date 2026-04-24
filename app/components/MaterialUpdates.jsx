@@ -10,7 +10,7 @@ function riskColor(risk) {
 
 function actionLabel(risk, type) {
   if (risk === "High") return { label: "Act Now", color: "var(--accent-red)", bg: "rgba(217,74,93,0.12)" };
-  if (type === "Credit Rating" || type === "Regulation") return { label: "Monitor", color: "var(--accent-amber)", bg: "rgba(183,121,31,0.12)" };
+  if (["Credit Rating", "Ratings / Credit", "Regulation", "Penalty"].includes(type)) return { label: "Monitor", color: "var(--accent-amber)", bg: "rgba(183,121,31,0.12)" };
   return { label: "Track", color: "var(--accent-blue)", bg: "rgba(94,167,239,0.12)" };
 }
 
@@ -81,6 +81,11 @@ export default function MaterialUpdates({ updates = [], onSelectNews }) {
                       </a>
                     )}
                   </div>
+                  {update.reason && (
+                    <p className="text-[9px] text-[var(--text-dim)] font-mono mt-1 line-clamp-1">
+                      {update.reason}
+                    </p>
+                  )}
                 </div>
               </div>
             </article>

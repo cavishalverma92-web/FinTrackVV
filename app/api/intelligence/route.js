@@ -80,7 +80,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 9;
+const CACHE_VERSION = 14;
 
 const RSS_FEEDS = [
   {
@@ -96,6 +96,16 @@ const RSS_FEEDS = [
   {
     source: "SEBI",
     url: "https://www.sebi.gov.in/sebirss.xml",
+    defaultCategory: "Regulation",
+  },
+  {
+    source: "Google News Insurance Regulation",
+    url: "https://news.google.com/rss/search?q=%28IRDAI%20OR%20insurance%20regulator%29%20%28insurance%20OR%20insurtech%20OR%20broker%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Regulation",
+  },
+  {
+    source: "Google News Pension IFSCA Regulation",
+    url: "https://news.google.com/rss/search?q=%28PFRDA%20OR%20IFSCA%20OR%20GIFT%20City%29%20%28financial%20services%20OR%20fund%20OR%20insurance%20OR%20fintech%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Regulation",
   },
   {
@@ -176,6 +186,11 @@ const RSS_FEEDS = [
   {
     source: "Google News Rating Actions",
     url: "https://news.google.com/rss/search?q=%28upgrade%20OR%20downgrade%20OR%20%22rating%20watch%22%20OR%20outlook%29%20%28NBFC%20OR%20bank%20OR%20finance%20OR%20lender%29%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Credit Rating",
+  },
+  {
+    source: "Google News Acuite Brickwork Ratings",
+    url: "https://news.google.com/rss/search?q=%28Acuite%20OR%20Acuit%C3%A9%20OR%20Brickwork%20Ratings%29%20%28NBFC%20OR%20bank%20OR%20finance%20OR%20lender%29%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Credit Rating",
   },
   {
@@ -383,19 +398,19 @@ const NSE_BFSI_SYMBOLS = new Set([
 
 function annCategoryToCategory(rawCategory = "") {
   const cat = rawCategory.toLowerCase();
-  if (cat.includes("result") || cat.includes("financial") || cat.includes("earnings")) return "Policy";
-  if (cat.includes("rating")) return "Credit Rating";
-  if (cat.includes("board meeting") || cat.includes("board of directors")) return "Policy";
+  if (cat.includes("result") || cat.includes("financial") || cat.includes("earnings")) return "Earnings";
+  if (cat.includes("rating")) return "Ratings / Credit";
+  if (cat.includes("board meeting") || cat.includes("board of directors")) return "Management / Governance";
   if (cat.includes("ncd") || cat.includes("debenture") || cat.includes("bond") ||
       cat.includes("qip") || cat.includes("ipo") || cat.includes("rights") ||
-      cat.includes("fundrais") || cat.includes("allotment")) return "Fundraise";
+      cat.includes("fundrais") || cat.includes("allotment")) return "Funding / M&A";
   if (cat.includes("regulation") || cat.includes("rbi") || cat.includes("sebi") ||
       cat.includes("penalty") || cat.includes("compliance")) return "Regulation";
   if (cat.includes("merger") || cat.includes("acquisition") || cat.includes("amalgamation") ||
       cat.includes("joint venture") || cat.includes("agreement")) return "Partnership";
   if (cat.includes("litigation") || cat.includes("fraud") || cat.includes("npa") ||
-      cat.includes("default") || cat.includes("insolvency")) return "Risk Signal";
-  return "Policy";
+      cat.includes("default") || cat.includes("insolvency")) return "Risk Alert";
+  return "Company Filing";
 }
 
 function filingRawCategory(...values) {
@@ -454,6 +469,8 @@ async function fetchBseAnnouncements() {
           ? `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${attachmentFile}`
           : `https://www.bseindia.com/corporates/ann.aspx?scripcode=${scripCode}`;
         const title = filingTitle(company, headline);
+        const sector = classifySector(`${company} ${headline}`, category);
+        const segment = classifySegment(`${company} ${headline}`, category);
 
         return {
           id: `BSE-${scripCode}-${hashText(`${title}-${dt}`)}-${i}`,
@@ -461,8 +478,10 @@ async function fetchBseAnnouncements() {
           source: "BSE",
           exchange: "BSE",
           company,
-          segment: classifySegment(`${company} ${headline}`, category),
+          sector,
+          segment,
           category,
+          eventType: category,
           headline: title,
           tldr: `BSE exchange filing — ${r.CATEGORYNAME || "Corporate Announcement"}`,
           whyMatters: buildWhyMatters(category, "BSE"),
@@ -470,7 +489,7 @@ async function fetchBseAnnouncements() {
           impactDigital: "Low",
           impactInvestor: "High",
           tags: ["Exchange Filing", "BSE", company, category],
-          risk: category === "Risk Signal" ? "High" : "Low",
+          risk: category === "Risk Alert" ? "High" : "Low",
           trending: false,
           url: annUrl,
           publishedAt: dt,
@@ -479,6 +498,7 @@ async function fetchBseAnnouncements() {
           dedupeKey: filingDedupeKey("filing", company, headline, dt),
           sourceTier: "primary",
           sourceType: "exchange_filing",
+          materialityReason: materialityReason({ category, sector, source: "BSE", sourceType: "exchange_filing", entities: [company] }),
         };
       });
   } catch (error) {
@@ -533,6 +553,8 @@ async function fetchNseAnnouncements() {
           ? `https://nsearchives.nseindia.com/corporate/ann/${attachmentFile}`
           : `https://www.nseindia.com/companies-listing/corporate-filings-announcements`;
         const title = filingTitle(company, headline);
+        const sector = classifySector(`${company} ${headline}`, category);
+        const segment = classifySegment(`${company} ${headline}`, category);
 
         return {
           id: `NSE-${symbol}-${hashText(`${title}-${dt}`)}-${i}`,
@@ -540,8 +562,10 @@ async function fetchNseAnnouncements() {
           source: "NSE",
           exchange: "NSE",
           company,
-          segment: classifySegment(`${company} ${headline}`, category),
+          sector,
+          segment,
           category,
+          eventType: category,
           headline: title,
           tldr: `NSE exchange filing — ${r.bflag || r.an_type || "Corporate Announcement"}`,
           whyMatters: buildWhyMatters(category, "NSE"),
@@ -549,7 +573,7 @@ async function fetchNseAnnouncements() {
           impactDigital: "Low",
           impactInvestor: "High",
           tags: ["Exchange Filing", "NSE", company, category],
-          risk: category === "Risk Signal" ? "High" : "Low",
+          risk: category === "Risk Alert" ? "High" : "Low",
           trending: false,
           url: annUrl,
           publishedAt: dt,
@@ -558,6 +582,7 @@ async function fetchNseAnnouncements() {
           dedupeKey: filingDedupeKey("filing", company, headline, dt),
           sourceTier: "primary",
           sourceType: "exchange_filing",
+          materialityReason: materialityReason({ category, sector, source: "NSE", sourceType: "exchange_filing", entities: [company] }),
         };
       });
   } catch (error) {
@@ -635,6 +660,7 @@ async function fallbackPayload(error) {
       ].map((api) => ({ ...api, type: "API", status: "fallback", itemCount: 0, error: error.message })),
     },
     sourceHealth: [],
+    qualityStats: { candidateItems: fallbackNewsItems.length, materialItems: fallbackNewsItems.length, filteredItems: 0 },
     error: error.message,
     updatedAt: new Date().toISOString(),
     cache: {
@@ -668,11 +694,11 @@ const FINANCE_SYMBOLS = [
 ];
 
 const CATEGORY_KEYWORDS = [
-  { category: "Credit Rating", words: ["rating", "crisil", "icra", "care ratings", "india ratings", "upgrade", "downgrade"] },
-  { category: "Fundraise", words: ["fundraise", "raises", "funding", "capital", "ipo", "ncd", "bond", "debt"] },
+  { category: "Ratings / Credit", words: ["rating", "crisil", "icra", "care ratings", "india ratings", "upgrade", "downgrade"] },
+  { category: "Funding / M&A", words: ["fundraise", "raises", "funding", "capital", "ipo", "ncd", "bond", "debt"] },
   { category: "Partnership", words: ["co-lending", "partnership", "partners", "tie-up", "collaboration"] },
-  { category: "Risk Signal", words: ["default", "delinquency", "stress", "fraud", "npa", "gnpa", "risk"] },
-  { category: "AI & Tech", words: ["ai", "artificial intelligence", "digital", "technology", "fintech", "platform"] },
+  { category: "Risk Alert", words: ["default", "delinquency", "stress", "fraud", "npa", "gnpa", "risk"] },
+  { category: "Product / Tech", words: ["ai", "artificial intelligence", "digital", "technology", "fintech", "platform"] },
   { category: "Policy", words: ["scheme", "budget", "ministry", "msme", "guarantee", "psl"] },
   { category: "Regulation", words: ["rbi", "sebi", "circular", "notification", "guideline", "regulation", "compliance"] },
 ];
@@ -709,6 +735,74 @@ const RELEVANCE_WORDS = [
   "interest income", "net income", "disbursement", "aum",
 ];
 
+const RATING_AGENCY_TERMS = [
+  "crisil", "icra", "care ratings", "india ratings", "india ratings and research",
+  "ind-ra", "acuite", "acuité", "brickwork", "rating rationale", "rating action",
+  "credit rating", "outlook revised", "rating watch",
+];
+
+const BFSI_ENTITY_TERMS = [
+  "nbfc", "non banking", "non-banking", "bank", "small finance bank", "co-operative bank",
+  "cooperative bank", "housing finance", "hfc", "microfinance", "mfi", "gold loan",
+  "vehicle finance", "msme lending", "consumer lending", "personal loan", "credit card",
+  "digital lending", "digital lender", "fintech lender", "payments bank", "payment aggregator",
+  "payment gateway", "upi", "wealthtech", "broking", "stock broker", "insurance", "asset management",
+  "amc", "mutual fund", "lending service provider", "lsp", "dlg", "co-lending", "co lending",
+  "loan book", "aum", "gnpa", "nnpa", "capital adequacy", "provisioning", "collection efficiency",
+  "disbursement", "asset quality", "cost of funds", "credit cost",
+];
+
+const REGULATORY_MATERIAL_TERMS = [
+  "master direction", "circular", "notification", "guideline", "directions", "framework",
+  "penalty", "restriction", "cease and desist", "supervisory", "compliance", "kyc",
+  "fair practices", "outsourcing", "digital lending", "payments", "nbfc", "bank",
+  "credit information", "co-lending", "priority sector", "fraud", "wilful defaulter",
+  "non-performing", "asset quality", "capital adequacy",
+];
+
+const HARD_EXCLUDE_PATTERNS = [
+  /\bmoney market operations\b/i,
+  /\bunderwriting auction\b/i,
+  /\bauction for sale of government securities\b/i,
+  /\bgovernment securities\b/i,
+  /\bg-sec\b/i,
+  /\btreasury bill\b/i,
+  /\bsovereign gold bond\b/i,
+  /\bsgb\b/i,
+  /\bfloating rate savings bonds?\b/i,
+  /\bfrsb\b/i,
+  /\bstock to buy\b/i,
+  /\bbuy for short-term\b/i,
+  /\bshould you buy, sell or hold\b/i,
+  /\bhow to open a demat account\b/i,
+  /\bstep-by-step guide\b/i,
+  /\bshare price (?:dips|falls|rises|jumps) ahead of earnings\b/i,
+  /\blive:\s/i,
+  /\bwar impact: indian stock market\b/i,
+  /\bindian stock market downgraded\b/i,
+  /\brupee tracks asian peers\b/i,
+  /\brbi bulletin\b/i,
+  /\bnotice of demand under recovery certificate\b/i,
+];
+
+const EVENT_TYPE_ALIASES = {
+  "Credit Rating": "Ratings / Credit",
+  "Risk Signal": "Risk Alert",
+  Fundraise: "Funding / M&A",
+  "AI & Tech": "Product / Tech",
+};
+
+const HIGH_SIGNAL_EVENT_TYPES = new Set([
+  "Regulation",
+  "Penalty",
+  "Ratings / Credit",
+  "Risk Alert",
+  "Earnings",
+  "Company Filing",
+  "Funding / M&A",
+  "Partnership",
+]);
+
 const SOURCE_WEIGHTS = {
   BSE: 42,
   NSE: 42,
@@ -727,8 +821,11 @@ const SOURCE_WEIGHTS = {
   "Google News NDTV Profit": 18,
   "Google News Credit Ratings": 24,
   "Google News Rating Actions": 24,
+  "Google News Acuite Brickwork Ratings": 24,
   "Google News CGFMU": 22,
   "Google News RBI Regulatory Updates": 26,
+  "Google News Insurance Regulation": 20,
+  "Google News Pension IFSCA Regulation": 20,
   GDELT: 12,
   "BQ Prime": 22,
   PIB: 30,
@@ -759,12 +856,20 @@ const SOURCE_WEIGHTS = {
 
 const CATEGORY_WEIGHTS = {
   Regulation: 35,
+  Penalty: 34,
+  "Risk Alert": 32,
   "Risk Signal": 32,
+  "Ratings / Credit": 28,
   "Credit Rating": 28,
+  Earnings: 24,
+  "Company Filing": 22,
   Fundraise: 20,
+  "Funding / M&A": 20,
   Partnership: 18,
   Policy: 18,
   "AI & Tech": 20,
+  "Product / Tech": 20,
+  "Market / Macro": 8,
 };
 
 function decodeEntities(value = "") {
@@ -847,27 +952,45 @@ function sha256(value) {
   return createHash("sha256").update(String(value || "")).digest("hex");
 }
 
-function classifyCategory(text, fallback) {
-  const lower = text.toLowerCase();
-  if (["crisil", "icra", "care ratings", "india ratings", "rating", "upgrade", "downgrade", "outlook", "watch"].some((word) => lower.includes(word))) {
-    return "Credit Rating";
-  }
-  if (["rbi", "sebi", "circular", "notification", "direction", "guideline", "regulation", "compliance", "penalty"].some((word) => lower.includes(word))) {
-    return "Regulation";
-  }
-  if (["npa", "gnpa", "default", "delinquency", "fraud", "stress", "restriction", "ban"].some((word) => lower.includes(word))) {
-    return "Risk Signal";
-  }
-  const match = CATEGORY_KEYWORDS.find(({ words }) => words.some((word) => lower.includes(word)));
-  return match?.category || fallback || "Policy";
+function normalizeEventType(value = "") {
+  return value ? (EVENT_TYPE_ALIASES[value] || value) : "";
 }
 
-function classifySegment(text, category) {
+export function classifyCategory(text, fallback) {
   const lower = text.toLowerCase();
+  const normalizedFallback = normalizeEventType(fallback);
+  const hasBfsiContext = BFSI_ENTITY_TERMS.some((word) => lower.includes(word));
+  const hasRatingAgency = RATING_AGENCY_TERMS.some((word) => lower.includes(word));
+
+  if (["penalty", "penalised", "penalized", "fine", "fined", "enforcement action"].some((word) => lower.includes(word))) return "Penalty";
+  if (["rbi", "sebi", "irdai", "pfrda", "ifsca", "circular", "notification", "direction", "guideline", "regulation", "compliance"].some((word) => lower.includes(word))) return "Regulation";
+  if (hasRatingAgency && hasBfsiContext) return "Ratings / Credit";
+  if (hasBfsiContext && ["npa", "gnpa", "nnpa", "default", "delinquency", "fraud", "stress", "restriction", "ban", "liquidity pressure", "asset quality"].some((word) => lower.includes(word))) return "Risk Alert";
+  if (["quarterly results", "q4 results", "q3 results", "q2 results", "q1 results", "earnings", "net profit", "financial results"].some((word) => lower.includes(word))) return "Earnings";
+  if (["ipo", "drhp", "qip", "fundraise", "funding round", "raises", "stake sale", "merger", "acquisition"].some((word) => lower.includes(word))) return "Funding / M&A";
+
+  const match = CATEGORY_KEYWORDS.find(({ words }) => words.some((word) => lower.includes(word)));
+  const matchedCategory = normalizeEventType(match?.category);
+  if (matchedCategory === "Ratings / Credit" && !hasBfsiContext && !hasRatingAgency) {
+    return normalizedFallback === "Ratings / Credit" ? "Policy" : normalizedFallback || "Policy";
+  }
+  if (matchedCategory === "Risk Alert" && !hasBfsiContext) {
+    return normalizedFallback === "Risk Alert" ? "Policy" : normalizedFallback || "Policy";
+  }
+  return matchedCategory || normalizedFallback || "Policy";
+}
+
+function classifySector(text, category) {
+  const lower = text.toLowerCase();
+
+  if (["gold loan", "muthoot", "manappuram", "rupeek"].some((word) => lower.includes(word))) return "Gold Loans";
+  if (["vehicle finance", "commercial vehicle", "cv finance", "mahindra finance", "shriram finance"].some((word) => lower.includes(word))) return "Vehicle Finance";
+  if (["housing finance", "home loan", "hfc ", " hfc", "aavas", "aptus", "home first", "can fin", "lic housing", "pnb housing"].some((word) => lower.includes(word))) return "HFCs";
+  if (["microfinance", "nbfc-mfi", "mfi ", " mfi", "creditaccess", "spandana", "fusion finance", "muthoot microfin", "arohan"].some((word) => lower.includes(word))) return "MFIs";
 
   // AI & Tech — broad FS/finance technology signals
   if (
-    category === "AI & Tech" ||
+    ["Product / Tech", "AI & Tech"].includes(category) ||
     [
       "generative ai", "large language model", "llm ", " llm", "ai in lending", "ai in banking",
       "ai underwriting", "ai credit", "ai fintech", "ai-powered lending", "ai-driven",
@@ -882,7 +1005,7 @@ function classifySegment(text, category) {
       "perfios", "setu ", " setu", "signzy", "idfy", "karza", "bureau.id", "finbox", "lentra",
     ].some((word) => lower.includes(word)) ||
     [" ai ", "artificial intelligence"].some((word) => ` ${lower} `.includes(word))
-  ) return "AI & Tech";
+  ) return "Fintech Infra";
 
   // Digital Lenders
   if ([
@@ -898,7 +1021,7 @@ function classifySegment(text, category) {
     "flexiloans", "indifi", "neogrowth", "oxyzo", "mintifi", "progcap",
     "yubi", "credavenue", "cred avenue", "northern arc capital", "vivriti capital",
     "getvantage", "recur club", "rupeek", "paysense", "finnable",
-    "krazybee", "incred", "ring ",
+    "krazybee", "incred", "ring app", "ring fintech", "dmi finance", "axio", "capital float",
   ].some((word) => lower.includes(word))) return "Digital Lenders";
 
   // NBFCs
@@ -928,26 +1051,41 @@ function classifySegment(text, category) {
     "au small finance", "jana bank", "equitas bank", "ujjivan",
   ].some((word) => lower.includes(word))) return "Banks";
 
+  if (["upi", "payment aggregator", "payment gateway", "payments bank", "phonepe", "paytm", "mobikwik", "bharatpe"].some((word) => lower.includes(word))) return "Payments";
+  if (["zerodha", "groww", "angel one", "nuvama", "broking", "broker"].some((word) => lower.includes(word))) return "Broking";
+  if (["insurance", "insurtech", "policybazaar", "pb fintech", "hdfc life", "sbi life", "star health"].some((word) => lower.includes(word))) return "Insurance";
+  if (["asset management", "mutual fund", "amc", "hdfc amc", "nippon india amc", "uti amc"].some((word) => lower.includes(word))) return "Asset Management";
+
   return "Others";
+}
+
+function classifySegment(text, category) {
+  const sector = classifySector(text, category);
+  if (["HFCs", "MFIs", "Gold Loans", "Vehicle Finance"].includes(sector)) return "NBFCs";
+  if (sector === "Fintech Infra") return "AI & Tech";
+  if (["Payments", "Broking", "Insurance", "Asset Management"].includes(sector)) return "Others";
+  return sector;
 }
 
 function riskFor(text, category) {
   const lower = text.toLowerCase();
-  if (["Risk Signal"].includes(category) || ["default", "fraud", "downgrade", "npa", "stress"].some((word) => lower.includes(word))) {
+  const hasRiskTerm = /\b(default|fraud|downgrade|downgraded|npa|gnpa|nnpa|stress|restriction|restricted|ban|barred)\b/i.test(lower);
+  if (["Risk Alert", "Risk Signal"].includes(category) || (BFSI_ENTITY_TERMS.some((word) => lower.includes(word)) && hasRiskTerm)) {
     return "High";
   }
-  if (["Regulation", "Credit Rating"].includes(category)) {
+  if (["Regulation", "Ratings / Credit", "Credit Rating", "Penalty"].includes(category)) {
     return "Medium";
   }
   return "Low";
 }
 
 export function impactFor(category, risk) {
+  const normalizedCategory = normalizeEventType(category);
   if (risk === "High") return { nbfc: "High", digital: "Critical", investor: "High" };
-  if (category === "Regulation") return { nbfc: "High", digital: "High", investor: "Medium" };
-  if (category === "Credit Rating") return { nbfc: "High", digital: "Medium", investor: "High" };
-  if (category === "Fundraise") return { nbfc: "Medium", digital: "High", investor: "High" };
-  if (category === "Partnership") return { nbfc: "High", digital: "Medium", investor: "Medium" };
+  if (normalizedCategory === "Regulation" || normalizedCategory === "Penalty") return { nbfc: "High", digital: "High", investor: "Medium" };
+  if (normalizedCategory === "Ratings / Credit") return { nbfc: "High", digital: "Medium", investor: "High" };
+  if (normalizedCategory === "Funding / M&A") return { nbfc: "Medium", digital: "High", investor: "High" };
+  if (normalizedCategory === "Partnership") return { nbfc: "High", digital: "Medium", investor: "Medium" };
   return { nbfc: "Medium", digital: "Medium", investor: "Medium" };
 }
 
@@ -1048,27 +1186,38 @@ function relevanceScore(item) {
   const categoryScore = CATEGORY_WEIGHTS[item.category] || 10;
   const riskScore = item.risk === "High" ? 25 : item.risk === "Medium" ? 10 : 0;
   const linkScore = item.url ? 5 : 0;
+  const sectorScore = item.sector && item.sector !== "Others" ? 18 : item.segment && item.segment !== "Others" ? 10 : -20;
+  const primaryScore = item.sourceType === "exchange_filing" || ["RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA"].includes(item.source) ? 12 : 0;
 
-  return Math.round(recencyScore + sourceScore + categoryScore + riskScore + linkScore);
+  return Math.round(recencyScore + sourceScore + categoryScore + riskScore + linkScore + sectorScore + primaryScore);
 }
 
 function buildWhyMatters(category, source) {
   const notes = {
     Regulation: "Regulatory updates can change compliance cost, product design, and distribution rules for NBFCs and digital lenders.",
-    "Credit Rating": "Rating actions influence borrowing costs, debt-market access, and investor perception across comparable lenders.",
-    Fundraise: "Capital-market activity signals liquidity appetite and competitive intensity for Indian lending platforms.",
+    Penalty: "Penalty and enforcement actions are early signals for compliance risk, process gaps, and supervisory intensity.",
+    "Ratings / Credit": "Rating actions influence borrowing costs, debt-market access, and investor perception across comparable lenders.",
+    "Funding / M&A": "Capital-market activity signals liquidity appetite and competitive intensity for Indian lending platforms.",
     Partnership: "Partnerships can shift origination economics, PSL access, customer acquisition, and risk sharing between banks and NBFCs.",
-    "Risk Signal": "Early credit-stress indicators can affect underwriting, provisioning, growth appetite, and valuation multiples.",
+    "Risk Alert": "Early credit-stress indicators can affect underwriting, provisioning, growth appetite, and valuation multiples.",
+    Earnings: "Earnings updates show growth, asset quality, profitability, and capital trends that matter for peer benchmarking.",
+    "Company Filing": "Company filings are primary-source signals for governance, capital actions, financials, and management updates.",
     Policy: "Policy and scheme changes can alter guarantee cover, priority-sector flows, and the addressable market for lenders.",
-    "AI & Tech": "Technology adoption can reshape credit scoring, servicing cost, fraud control, and customer onboarding speed.",
+    "Product / Tech": "Technology adoption can reshape credit scoring, servicing cost, fraud control, and customer onboarding speed.",
   };
 
   return `${notes[category] || notes.Policy} Source: ${source}.`;
 }
 
-const EXCLUDED_PORTAL_PATTERNS = [
-  /\bmoney market operations\b/i,
-];
+function materialityReason(item = {}) {
+  const reasons = [];
+  if (item.sourceType === "exchange_filing") reasons.push("primary exchange filing");
+  if (["RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA"].includes(item.source)) reasons.push("primary regulator source");
+  if (item.category) reasons.push(item.category.toLowerCase());
+  if (item.sector && item.sector !== "Others") reasons.push(item.sector);
+  if (item.entities?.length) reasons.push(`named entity: ${item.entities.slice(0, 2).join(", ")}`);
+  return reasons.length ? reasons.join(" | ") : "financial-services relevance matched";
+}
 
 function shouldExcludePortalItem(item = {}) {
   const text = [
@@ -1079,28 +1228,70 @@ function shouldExcludePortalItem(item = {}) {
     item.detail,
   ].filter(Boolean).join(" ").toLowerCase();
 
-  return EXCLUDED_PORTAL_PATTERNS.some((pattern) => pattern.test(text));
+  return HARD_EXCLUDE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function itemSearchText(item = {}) {
+  return [
+    item.title,
+    item.headline,
+    item.description,
+    item.tldr,
+    item.detail,
+    item.company,
+    item.source,
+    item.category,
+    item.eventType,
+    item.sector,
+    ...(item.tags || []),
+  ].filter(Boolean).join(" ");
+}
+
+export function isFinancialServicesMaterial(item = {}) {
+  const text = itemSearchText(item).toLowerCase();
+  if (!text.trim()) return false;
+  if (shouldExcludePortalItem(item)) return false;
+  if (item.sourceType === "exchange_filing") return true;
+
+  const hasKnownEntity = extractEntities(text).length > 0;
+  const hasCoreBfsiTerm = BFSI_ENTITY_TERMS.some((word) => text.includes(word));
+  const hasRegulatoryMaterial = REGULATORY_MATERIAL_TERMS.some((word) => text.includes(word));
+  const hasRatingAgency = RATING_AGENCY_TERMS.some((word) => text.includes(word));
+  const source = String(item.source || "");
+  const isPrimaryRegulator = ["RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA", "PIB"].includes(source);
+  const eventType = normalizeEventType(item.eventType || item.category || item.defaultCategory);
+  const highSignalEvent = HIGH_SIGNAL_EVENT_TYPES.has(eventType);
+
+  if (isPrimaryRegulator) return hasCoreBfsiTerm || hasRegulatoryMaterial || hasKnownEntity;
+  if (hasRatingAgency) return hasCoreBfsiTerm || hasKnownEntity;
+  if (hasKnownEntity && highSignalEvent) return true;
+  if (hasCoreBfsiTerm && highSignalEvent) return true;
+  return hasCoreBfsiTerm && ["ET BFSI", "BusinessLine", "Financial Express Direct", "Moneycontrol Banks Direct"].includes(source);
 }
 
 function filterPortalItems(items = []) {
-  return items.filter((item) => !shouldExcludePortalItem(item));
+  return items.filter((item) => isFinancialServicesMaterial(item));
 }
 
 function toNewsItem(item, index) {
-  const combined = `${item.title} ${item.description}`;
+  const combined = `${item.title} ${item.description} ${item.source}`;
   const category = classifyCategory(combined, item.defaultCategory);
+  const sector = classifySector(combined, category);
   const segment = classifySegment(combined, category);
   const risk = riskFor(combined, category);
   const impact = impactFor(category, risk);
   const keywords = CATEGORY_KEYWORDS.find((entry) => entry.category === category)?.words || [];
-  const tags = [category, item.source, ...keywords.slice(0, 1)].filter(Boolean);
+  const entities = extractEntities(combined);
+  const tags = [category, sector, item.source, ...entities.slice(0, 2), ...keywords.slice(0, 1)].filter(Boolean);
 
   return {
     id: `${item.source}-${hashText(item.link || item.title)}-${index}`,
     time: relativeTime(item.publishedAt),
     source: item.source,
+    sector,
     segment,
     category,
+    eventType: category,
     headline: item.title,
     tldr: item.description || item.title,
     whyMatters: buildWhyMatters(category, item.source),
@@ -1114,8 +1305,8 @@ function toNewsItem(item, index) {
       const score =
         (risk === "High" ? 3 : 0) +
         (category === "Regulation" ? 2 : 0) +
-        (category === "Credit Rating" ? 2 : 0) +
-        (category === "Risk Signal" ? 2 : 0) +
+        (["Ratings / Credit", "Credit Rating"].includes(category) ? 2 : 0) +
+        (["Risk Alert", "Risk Signal", "Penalty"].includes(category) ? 2 : 0) +
         (["RBI", "SEBI", "PIB"].includes(item.source) ? 2 : 0) +
         (ageHours < 6 ? 1 : 0);
       return score >= 3;
@@ -1125,15 +1316,16 @@ function toNewsItem(item, index) {
     publishedTs: publishedTime(item),
     sourceTier: sourceTierFor(item.source),
     sourceType: item.sourceType || "news_feed",
+    materialityReason: materialityReason({ category, sector, source: item.source, entities, sourceType: item.sourceType || "news_feed" }),
   };
 }
 
 function buildAlerts(newsItems) {
   return newsItems
-    .filter((item) => item.risk === "High" || item.category === "Regulation" || item.category === "Credit Rating")
+    .filter((item) => item.risk === "High" || ["Regulation", "Penalty", "Ratings / Credit", "Credit Rating"].includes(item.category))
     .slice(0, 5)
     .map((item) => ({
-      type: item.risk === "High" ? "critical" : item.category === "Credit Rating" ? "success" : "info",
+      type: item.risk === "High" ? "critical" : ["Ratings / Credit", "Credit Rating"].includes(item.category) ? "success" : "info",
       text: item.headline,
       time: item.time,
       source: item.source,
@@ -1155,6 +1347,16 @@ const WATCHLIST_ENTITIES = [
   { name: "Kissht", group: "Digital Lender", keywords: ["kissht"] },
   { name: "KreditBee", group: "Digital Lender", keywords: ["kreditbee", "krazybee"] },
   { name: "Navi", group: "Digital Lender", keywords: ["navi fintech", "navi"] },
+  { name: "Fibe", group: "Digital Lender", keywords: ["fibe", "earlysalary", "early salary"] },
+  { name: "DMI Finance", group: "Digital Lender", keywords: ["dmi finance", "dmi fintech"] },
+  { name: "Lendingkart", group: "Digital Lender", keywords: ["lendingkart"] },
+  { name: "Indifi", group: "Digital Lender", keywords: ["indifi"] },
+  { name: "Axio", group: "Digital Lender", keywords: ["axio", "capital float"] },
+  { name: "PhonePe", group: "Payments", keywords: ["phonepe"] },
+  { name: "Paytm", group: "Payments", keywords: ["paytm", "one 97 communications"] },
+  { name: "Groww", group: "Broking", keywords: ["groww"] },
+  { name: "Zerodha", group: "Broking", keywords: ["zerodha"] },
+  { name: "Angel One", group: "Broking", keywords: ["angel one", "angel broking"] },
   { name: "HDFC Bank", group: "Bank", keywords: ["hdfc bank"] },
   { name: "ICICI Bank", group: "Bank", keywords: ["icici bank"] },
   { name: "SBI", group: "Bank", keywords: ["sbi", "state bank of india"] },
@@ -1182,7 +1384,10 @@ const ENTITY_MASTER = (() => {
 export function extractEntities(text = "") {
   const lower = text.toLowerCase();
   return ENTITY_MASTER
-    .filter((entity) => entity.keywords.some((keyword) => lower.includes(keyword)))
+    .filter((entity) => {
+      if (entity.name === "Bank of India" && lower.includes("reserve bank of india")) return false;
+      return entity.keywords.some((keyword) => lower.includes(keyword));
+    })
     .map((entity) => entity.name)
     .slice(0, 8);
 }
@@ -1242,14 +1447,21 @@ function materialScore(item) {
   const risk = item.risk === "High" ? 45 : item.risk === "Medium" ? 18 : 0;
   const category = {
     Regulation: 35,
+    Penalty: 38,
+    "Ratings / Credit": 32,
     "Credit Rating": 32,
+    "Risk Alert": 40,
     "Risk Signal": 40,
+    Earnings: 28,
+    "Company Filing": 24,
     Policy: 22,
     Fundraise: 18,
+    "Funding / M&A": 18,
     Partnership: 15,
     "AI & Tech": 10,
+    "Product / Tech": 10,
   }[item.category] || 8;
-  const official = ["RBI", "SEBI"].includes(item.source) ? 28 : 0;
+  const official = ["RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA", "BSE", "NSE"].includes(item.source) ? 28 : 0;
 
   return base + risk + category + official;
 }
@@ -1267,6 +1479,7 @@ function buildMaterialUpdates(newsItems = [], peerData = [], ratingChanges = [])
       risk: item.risk || "Low",
       score: materialScore(item),
       newsItem: item,
+      reason: item.materialityReason || item.scoreReasoning,
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 6);
@@ -1315,7 +1528,7 @@ function buildWatchlist(newsItems = [], peerData = [], ratingChanges = []) {
       return entity.keywords.some((keyword) => text.includes(keyword));
     });
     const highRisk = matches.some((item) => item.risk === "High") || rating?.direction === "down";
-    const mediumRisk = highRisk || matches.some((item) => ["Regulation", "Credit Rating", "Risk Signal"].includes(item.category));
+    const mediumRisk = highRisk || matches.some((item) => ["Regulation", "Penalty", "Ratings / Credit", "Credit Rating", "Risk Alert", "Risk Signal"].includes(item.category));
 
     return {
       name: entity.name,
@@ -1340,11 +1553,12 @@ function buildWatchlist(newsItems = [], peerData = [], ratingChanges = []) {
 
 function buildRatingChanges(newsItems) {
   return newsItems
-    .filter((item) => item.category === "Credit Rating")
+    .filter((item) => ["Ratings / Credit", "Credit Rating"].includes(item.category) && (item.entities?.length || RATING_AGENCY_TERMS.some((term) => `${item.headline} ${item.tldr} ${item.source}`.toLowerCase().includes(term))))
     .slice(0, 8)
     .map((item) => {
       const lower = item.headline.toLowerCase();
       const direction = lower.includes("downgrade") || lower.includes("negative") ? "down" : "up";
+      const entity = item.entities?.[0] || item.company || item.headline.split(/[:|\-|—]/)[0].slice(0, 48);
       return {
         entity: item.headline.split(/[:|-|—]/)[0].slice(0, 48),
         from: "Watch",
@@ -1354,6 +1568,7 @@ function buildRatingChanges(newsItems) {
         direction,
         date: item.time,
         rationale: item.tldr,
+        entity,
       };
     });
 }
@@ -1462,6 +1677,8 @@ export function dedupeAndRankNews(items) {
   const ranked = items
     .map((item) => {
       const enrichedItem = applyTimeFields(item);
+      const category = normalizeEventType(enrichedItem.category) || enrichedItem.category || classifyCategory(`${enrichedItem.headline} ${enrichedItem.tldr}`, enrichedItem.defaultCategory);
+      const sector = enrichedItem.sector || classifySector(`${enrichedItem.headline} ${enrichedItem.tldr}`, category);
       const normalizedUrl = normalizeUrl(enrichedItem.url);
       const fingerprint = sha256([
         normalizeHeadline(enrichedItem.headline),
@@ -1470,17 +1687,22 @@ export function dedupeAndRankNews(items) {
         enrichedItem.category || "",
       ].join("|"));
       const entities = extractEntities(`${enrichedItem.headline} ${enrichedItem.tldr} ${(enrichedItem.tags || []).join(" ")}`);
-      const score = relevanceScore(enrichedItem);
+      const score = relevanceScore({ ...enrichedItem, category, sector });
 
       return {
         ...enrichedItem,
         normalizedUrl,
         contentFingerprint: fingerprint,
+        category,
+        eventType: enrichedItem.eventType || category,
+        sector,
+        segment: enrichedItem.segment || classifySegment(`${enrichedItem.headline} ${enrichedItem.tldr}`, category),
         entities,
         affectedEntities: entities.reduce((acc, name) => ({ ...acc, [name]: score }), {}),
         relatedSources: item.relatedSources || [enrichedItem.source],
         score,
-        scoreReasoning: scoreReasoning(enrichedItem, score, entities),
+        scoreReasoning: scoreReasoning({ ...enrichedItem, category, sector }, score, entities),
+        materialityReason: enrichedItem.materialityReason || materialityReason({ ...enrichedItem, category, sector, entities }),
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -1569,6 +1791,19 @@ async function fetchMarketData() {
     const meta = FINANCE_SYMBOLS.find((item) => item.symbol === peer.symbol);
     const screener = screenerData[meta?.screenerSlug] || {};
     const bse = bsePresentations[meta?.bseCode] || {};
+    const fieldCoverage = [
+      screener.marketCap || peer.marketCap,
+      screener.currentPrice || peer.price,
+      screener.pb,
+      screener.roe || peer.roe,
+      screener.roa,
+      screener.loanBook,
+      screener.qtrProfit,
+      screener.assetSize,
+      bse.presentationUrl,
+    ].filter(Boolean).length;
+    const metricsConfidence = fieldCoverage >= 6 ? "High" : fieldCoverage >= 3 ? "Medium" : "Low";
+    const metricsSources = [...new Set([marketSource, screener.source, bse.presentationUrl ? "BSE investor deck" : null].filter(Boolean))];
     return {
       ...peer,
       aum: peer.aum || screener.marketCap || 0,
@@ -1590,6 +1825,10 @@ async function fetchMarketData() {
       presentationUrl: bse.presentationUrl || null,
       presentationDate: bse.presentationDate || null,
       dataSource: screener.source || marketSource,
+      metricsSource: metricsSources.join(" + ") || marketSource,
+      metricsAsOf: bse.presentationDate || new Date().toISOString().slice(0, 10),
+      metricsPeriod: bse.presentationDate ? `Investor deck ${bse.presentationDate}` : "Latest available public data",
+      metricsConfidence,
     };
   });
 
@@ -1865,12 +2104,19 @@ async function fetchGlobalData() {
 
 const BUCKET_CONNECTORS = {
   Regulation: "On the regulatory front",
+  Penalty: "In enforcement",
   "Risk Signal": "Risk alert",
+  "Risk Alert": "Risk alert",
   "Credit Rating": "In credit markets",
+  "Ratings / Credit": "In credit markets",
   Fundraise: "On the capital side",
+  "Funding / M&A": "On the capital side",
   Partnership: "In partnership activity",
+  Earnings: "In earnings",
+  "Company Filing": "In filings",
   Policy: "Policy update",
   "AI & Tech": "In fintech and technology",
+  "Product / Tech": "In fintech and technology",
 };
 
 function buildBucketNarrative(items) {
@@ -1885,7 +2131,7 @@ function buildBucketNarrative(items) {
   const sentences = [];
   const used = new Set();
   const clip = (text, max = 95) => text && text.length > max ? `${text.slice(0, max)}…` : text;
-  const priorityOrder = ["Regulation", "Risk Signal", "Credit Rating", "Fundraise", "Partnership", "Policy", "AI & Tech"];
+  const priorityOrder = ["Regulation", "Penalty", "Risk Alert", "Risk Signal", "Ratings / Credit", "Credit Rating", "Funding / M&A", "Fundraise", "Partnership", "Earnings", "Company Filing", "Policy", "Product / Tech", "AI & Tech"];
 
   for (const cat of priorityOrder) {
     const catItems = (byCategory[cat] || []).filter((i) => !used.has(i.id));
@@ -1951,6 +2197,11 @@ function buildTimeBuckets(newsItems) {
         url: i.url,
         time: i.time,
         segment: i.segment,
+        sector: i.sector,
+        eventType: i.eventType || i.category,
+        entities: i.entities || [],
+        materialityReason: i.materialityReason || i.scoreReasoning,
+        score: i.score,
       })),
     };
   }).filter(Boolean);
@@ -1965,7 +2216,7 @@ function buildBriefHash(newsItems = [], ratingChanges = []) {
 
 function buildPrecedents(newsItems = []) {
   return newsItems
-    .filter((item) => item.sourceType === "exchange_filing" || ["Regulation", "Credit Rating", "Risk Signal"].includes(item.category))
+    .filter((item) => item.sourceType === "exchange_filing" || ["Regulation", "Penalty", "Ratings / Credit", "Credit Rating", "Risk Alert", "Risk Signal"].includes(item.category))
     .slice(0, 3)
     .map((item) => {
       if (item.sourceType === "exchange_filing") {
@@ -1974,7 +2225,7 @@ function buildPrecedents(newsItems = []) {
       if (item.category === "Regulation") {
         return `${item.source}: similar regulatory notices usually translate into compliance and product-rule changes within one cycle.`;
       }
-      if (item.category === "Credit Rating") {
+      if (["Ratings / Credit", "Credit Rating"].includes(item.category)) {
         return `${item.source}: rating actions often ripple into peer funding costs and debt market sentiment.`;
       }
       return `${item.headline}: risk signals like this tend to widen monitoring and underwriting scrutiny across peers.`;
@@ -1998,12 +2249,15 @@ function buildWatchFor(newsItems = []) {
 }
 
 function buildBriefSummary(newsItems = []) {
-  const top = newsItems.slice(0, 4);
+  const top = newsItems
+    .filter((item) => item.score >= 90 || item.sourceType === "exchange_filing" || ["Regulation", "Penalty", "Ratings / Credit", "Risk Alert"].includes(item.category))
+    .slice(0, 4);
   if (!top.length) return null;
   return top
     .map((item, index) => {
-      const prefix = index === 0 ? "What changed" : index === 1 ? "Why it matters" : "Also";
-      return `${prefix}: ${item.headline}.`;
+      const prefix = index === 0 ? "What changed" : index === 1 ? "Why it matters" : "Also watch";
+      const entity = item.entities?.[0] || item.company || item.sector || item.segment || item.source;
+      return `${prefix}: ${entity} - ${item.headline} (${item.source}).`;
     })
     .join(" ");
 }
@@ -2017,11 +2271,11 @@ function buildDailyBriefPayload(newsItems, ratingChanges, hash) {
     summary: buildBriefSummary(newsItems),
     timeBuckets: buildTimeBuckets(newsItems),
     riskSignals: newsItems
-      .filter((item) => item.risk === "High" || item.category === "Risk Signal")
+    .filter((item) => item.risk === "High" || ["Risk Alert", "Risk Signal"].includes(item.category))
       .slice(0, 3)
       .map((item) => item.headline),
     opportunities: newsItems
-      .filter((item) => ["Fundraise", "Partnership", "Policy", "AI & Tech"].includes(item.category))
+    .filter((item) => ["Funding / M&A", "Fundraise", "Partnership", "Policy", "Product / Tech", "AI & Tech"].includes(item.category))
       .slice(0, 3)
       .map((item) => item.headline),
     ratingSnapshot: {
@@ -2142,7 +2396,7 @@ function buildPenaltyTracker(newsItems) {
 }
 
 function sourceTierFor(source) {
-  if (["BSE", "NSE", "RBI", "SEBI", "PIB"].includes(source)) return "primary";
+  if (["BSE", "NSE", "RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA", "PIB"].includes(source)) return "primary";
   if (String(source || "").startsWith("Google News")) return "aggregator";
   return "direct";
 }
@@ -2205,7 +2459,13 @@ async function buildIntelligencePayload() {
     const gdeltItems = gdeltNewsResult.status === "fulfilled" ? gdeltNewsResult.value : [];
     const bseItems = bseResult.status === "fulfilled" ? bseResult.value : [];
     const nseItems = nseResult.status === "fulfilled" ? nseResult.value : [];
-    const freshDeduped = filterPortalItems(dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...htmlItems, ...gdeltItems]));
+    const freshCandidates = dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...htmlItems, ...gdeltItems]);
+    const freshDeduped = filterPortalItems(freshCandidates);
+    const qualityStats = {
+      candidateItems: freshCandidates.length,
+      materialItems: freshDeduped.length,
+      filteredItems: Math.max(0, freshCandidates.length - freshDeduped.length),
+    };
 
     // Merge fresh news with 24h archive from Redis
     const archive = archivedItems.status === "fulfilled" ? filterPortalItems(archivedItems.value) : [];
@@ -2299,6 +2559,7 @@ async function buildIntelligencePayload() {
       },
       sourceHealth: [...rssHealth, ...htmlHealth, ...apiHealth],
       sourceStats,
+      qualityStats,
       updatedAt: new Date().toISOString(),
       cache: {
         cached: false,

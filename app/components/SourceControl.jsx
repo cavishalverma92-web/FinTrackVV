@@ -66,6 +66,7 @@ function SourceRow({ source, type }) {
 
 export default function SourceControl({
   sources,
+  qualityStats,
   updatedAt,
   cache,
   dataStatus,
@@ -157,6 +158,14 @@ export default function SourceControl({
         <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
           <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">Aggregators</p>
           <p className="text-2xl font-bold text-[var(--accent-amber)] font-display mt-1">{aggregatorCount}</p>
+        </div>
+        <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] md:col-span-5">
+          <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">Quality Gate</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            {qualityStats
+              ? `${qualityStats.materialItems || 0} material items kept from ${qualityStats.candidateItems || 0} candidates; ${qualityStats.filteredItems || 0} noisy items filtered.`
+              : "No quality gate stats available for this snapshot."}
+          </p>
         </div>
       </div>
 

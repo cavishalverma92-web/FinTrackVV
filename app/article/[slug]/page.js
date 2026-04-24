@@ -78,6 +78,21 @@ export default async function ArticlePage({ params }) {
             {article.tldr}
           </p>
 
+          {(article.sector || article.eventType || article.materialityReason) && (
+            <section className="mb-8 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)] p-4">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-dim)] mb-3">
+                Materiality
+              </h2>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {article.eventType && <span className="px-2 py-1 rounded bg-[var(--bg-card)] text-[11px] font-mono text-[var(--text-secondary)]">{article.eventType}</span>}
+                {article.sector && <span className="px-2 py-1 rounded bg-[var(--bg-card)] text-[11px] font-mono text-[var(--text-secondary)]">{article.sector}</span>}
+              </div>
+              {article.materialityReason && (
+                <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{article.materialityReason}</p>
+              )}
+            </section>
+          )}
+
           <div className="grid gap-4 md:grid-cols-3 mb-8">
             <ImpactCard label="NBFC Impact" value={article.impactNBFC} />
             <ImpactCard label="Digital Impact" value={article.impactDigital} />

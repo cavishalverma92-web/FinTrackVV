@@ -83,6 +83,20 @@ export default function NewsDetail({ news }) {
             )}
           </div>
         )}
+        {(news.sector || news.eventType || news.materialityReason) && (
+          <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] mb-5">
+            <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest mb-2">
+              Materiality
+            </p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {news.eventType && <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-card)] font-mono">{news.eventType}</span>}
+              {news.sector && <span className="px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--text-secondary)] bg-[var(--bg-card)] font-mono">{news.sector}</span>}
+            </div>
+            {news.materialityReason && (
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{news.materialityReason}</p>
+            )}
+          </div>
+        )}
 
         {news.url && (
           <div className="flex flex-wrap gap-2 mb-5">

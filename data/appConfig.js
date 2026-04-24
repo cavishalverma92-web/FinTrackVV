@@ -5,6 +5,13 @@ export const FILTER_OPTIONS = [
   "Digital Lenders",
   "Banks",
   "AI & Tech",
+  "HFCs",
+  "MFIs",
+  "Gold Loans",
+  "Vehicle Finance",
+  "Payments",
+  "Broking",
+  "Insurance",
   "Others",
 ];
 

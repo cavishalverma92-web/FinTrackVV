@@ -76,6 +76,12 @@ function roeColor(value) {
   return "var(--text-secondary)";
 }
 
+function confidenceColor(value) {
+  if (value === "High") return "var(--accent-green)";
+  if (value === "Medium") return "var(--accent-amber)";
+  return "var(--accent-red)";
+}
+
 function formatRsCr(value) {
   const number = Number(value || 0);
   if (!number) return "-";
@@ -160,6 +166,7 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
   const aumCoverage = peerData.filter((peer) => peer.loanBook).length;
   const roaCoverage = peerData.filter((peer) => peer.roa).length;
   const deckCoverage = peerData.filter((peer) => peer.presentationUrl).length;
+  const highConfidence = peerData.filter((peer) => peer.metricsConfidence === "High").length;
 
   return (
     <div className="animate-fade-in">
@@ -201,6 +208,7 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
             <Coverage label="P/B" value={pbCoverage} total={peerData.length} />
             <Coverage label="Assets" value={assetCoverage} total={peerData.length} />
             <Coverage label="Investor Deck" value={deckCoverage} total={peerData.length} />
+            <Coverage label="High Confidence" value={highConfidence} total={peerData.length} />
           </div>
         </div>
       </div>
@@ -244,6 +252,8 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
                   { label: "P/E", align: "right" },
                   { label: "P/B", align: "right" },
                   { label: "Price Move", align: "right" },
+                  { label: "Confidence", align: "center" },
+                  { label: "As of", align: "right" },
                   { label: "Source", align: "right" },
                 ].map((col) => (
                   <th
@@ -334,8 +344,14 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
                   <td className={`px-4 py-3 text-right font-mono font-semibold ${Number(peer.disbGrowth || 0) >= 0 ? "text-[var(--accent-green)]" : "text-[var(--accent-red)]"}`}>
                     {Number(peer.disbGrowth || 0) >= 0 ? "+" : ""}{peer.disbGrowth || 0}%
                   </td>
+                  <td className="px-4 py-3 text-center font-mono font-semibold" style={{ color: confidenceColor(peer.metricsConfidence) }}>
+                    {peer.metricsConfidence || "Low"}
+                  </td>
                   <td className="px-4 py-3 text-right text-[var(--text-dim)] font-mono whitespace-nowrap">
-                    {peer.dataSource || "-"}
+                    {peer.metricsAsOf || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right text-[var(--text-dim)] font-mono whitespace-nowrap">
+                    {peer.metricsSource || peer.dataSource || "-"}
                   </td>
                 </tr>
               ))}

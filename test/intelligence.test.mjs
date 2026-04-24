@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  classifyCategory,
   dedupeAndRankNews,
   extractEntities,
   headlineSimilarity,
   impactFor,
+  isFinancialServicesMaterial,
   normalizeUrl,
 } from "../app/api/intelligence/route.js";
 
@@ -63,4 +65,55 @@ test("dedupeAndRankNews merges source variants of the same story", () => {
   const deduped = dedupeAndRankNews(items);
   assert.equal(deduped.length, 1);
   assert.equal(deduped[0].sourceCount, 2);
+});
+
+test("materiality gate blocks generic market and government securities noise", () => {
+  assert.equal(isFinancialServicesMaterial({
+    source: "RBI",
+    title: "Result of Underwriting Auction conducted on April 24, 2026",
+    description: "Additional Competitive Underwriting of Government securities",
+    defaultCategory: "Regulation",
+  }), false);
+
+  assert.equal(isFinancialServicesMaterial({
+    source: "Mint",
+    title: "Reliance Q4 results LIVE: RIL share price dips ahead of earnings",
+    description: "Broad market live blog about Reliance Industries",
+    defaultCategory: "Policy",
+  }), false);
+
+  assert.equal(isFinancialServicesMaterial({
+    source: "Mint",
+    title: "Tata Capital share price falls after Q4 results. Should you buy, sell or hold?",
+    description: "Stock advice format rather than source-linked financial intelligence",
+    defaultCategory: "Policy",
+  }), false);
+});
+
+test("materiality gate keeps regulator and lender-specific items", () => {
+  assert.equal(isFinancialServicesMaterial({
+    source: "RBI",
+    title: "RBI imposes monetary penalty on Ebix Payment Services Private Limited",
+    description: "Penalty for non-compliance with payment aggregator directions",
+    defaultCategory: "Regulation",
+  }), true);
+
+  assert.equal(isFinancialServicesMaterial({
+    source: "NSE",
+    sourceType: "exchange_filing",
+    headline: "[LICHSGFIN] Financial Results",
+    company: "LIC Housing Finance",
+  }), true);
+});
+
+test("classification avoids false credit rating from broad stock market downgrade", () => {
+  assert.notEqual(
+    classifyCategory("US-Iran war impact: Indian stock market downgraded by HSBC twice in a month", "Policy"),
+    "Ratings / Credit"
+  );
+});
+
+test("extractEntities avoids Bank of India false positive inside Reserve Bank of India", () => {
+  const entities = extractEntities("Reserve Bank of India releases underwriting auction result");
+  assert.ok(!entities.includes("Bank of India"));
 });

@@ -1,6 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
+  metadataBase: new URL("https://fin-track-vv.vercel.app"),
   title: "FinServTracker — NBFC & Lending Intelligence",
   description: "Real-time CEO intelligence dashboard for NBFCs, Digital Lenders and Banks — RBI, SEBI, ratings, market data.",
   icons: {

@@ -12,6 +12,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
 // ── Impact level badge ──
@@ -84,15 +85,25 @@ export default function NewsDetail({ news }) {
         )}
 
         {news.url && (
-          <a
-            href={news.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 mb-5 px-3 py-2 rounded-md bg-[var(--accent-blue)] text-white text-[11px] font-bold"
-          >
-            Read complete news
-            <ExternalLink size={12} />
-          </a>
+          <div className="flex flex-wrap gap-2 mb-5">
+            {news.slug && (
+              <Link
+                href={`/article/${news.slug}`}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border-subtle)] text-[11px] font-bold text-[var(--text-primary)]"
+              >
+                Open article page
+              </Link>
+            )}
+            <a
+              href={news.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--accent-blue)] text-white text-[11px] font-bold"
+            >
+              Read complete news
+              <ExternalLink size={12} />
+            </a>
+          </div>
         )}
 
         {/* ── TL;DR Section ── */}

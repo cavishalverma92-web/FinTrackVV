@@ -303,6 +303,11 @@ export default function NewsFeed({
                   Filing
                 </span>
               )}
+              {item.sourceCount > 1 && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-mono bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                  +{item.sourceCount - 1} source{item.sourceCount - 1 > 1 ? "s" : ""}
+                </span>
+              )}
               <Tag label={item.category} color={getCategoryColor(item.category)} />
               {item.trending && <Flame size={12} className="text-[var(--accent-amber)]" />}
               {isNew(item.publishedTs) && (
@@ -313,6 +318,7 @@ export default function NewsFeed({
               <div className="ml-auto flex items-center gap-1 text-[10px] text-[var(--text-dim)] font-mono">
                 <Clock size={10} />
                 {item.time}
+                {item.timeBasis === "ingested" ? " (ingested)" : ""}
               </div>
             </div>
 

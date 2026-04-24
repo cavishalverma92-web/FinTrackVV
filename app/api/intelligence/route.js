@@ -8,9 +8,11 @@ import {
   RATING_CHANGES,
   SECTOR_METRICS,
 } from "../../../data/mockData";
+import { createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { Redis } from "@upstash/redis";
+import { slugify, withArticleSlugs } from "../../lib/content";
 
 const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
   ? new Redis({
@@ -576,8 +578,9 @@ async function writeIntelligenceCache(payload) {
 }
 
 function fallbackPayload(error) {
+  const fallbackNewsItems = withArticleSlugs(NEWS_ITEMS).map(applyTimeFields);
   return {
-    newsItems: NEWS_ITEMS,
+    newsItems: fallbackNewsItems,
     alerts: ALERTS,
     ratingChanges: RATING_CHANGES,
     sectorMetrics: SECTOR_METRICS,
@@ -585,9 +588,10 @@ function fallbackPayload(error) {
     globalData: GLOBAL_DATA,
     coLendingData: CO_LENDING_DATA,
     govtSchemes: GOVT_SCHEMES,
-    materialUpdates: buildMaterialUpdates(NEWS_ITEMS, PEER_DATA, RATING_CHANGES),
-    watchlist: buildWatchlist(NEWS_ITEMS, PEER_DATA, RATING_CHANGES),
-    dailyBrief: buildDailyBrief(NEWS_ITEMS, RATING_CHANGES),
+    penalties: [],
+    materialUpdates: buildMaterialUpdates(fallbackNewsItems, PEER_DATA, RATING_CHANGES),
+    watchlist: buildWatchlist(fallbackNewsItems, PEER_DATA, RATING_CHANGES),
+    dailyBrief: buildDailyBrief(fallbackNewsItems, RATING_CHANGES),
     sources: {
       rss: RSS_FEEDS.map((feed) => ({ ...feed, type: "RSS", status: "fallback", itemCount: 0, error: error.message })),
       apis: [
@@ -772,6 +776,10 @@ function hashText(value) {
   return Math.abs(hash).toString(36);
 }
 
+function sha256(value) {
+  return createHash("sha256").update(String(value || "")).digest("hex");
+}
+
 function classifyCategory(text, fallback) {
   const lower = text.toLowerCase();
   if (["crisil", "icra", "care ratings", "india ratings", "rating", "upgrade", "downgrade", "outlook", "watch"].some((word) => lower.includes(word))) {
@@ -910,6 +918,38 @@ function publishedTime(item) {
   return !date || Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
+function normalizeUrl(value = "") {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    const blockedParams = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ocid", "cmpid"];
+    blockedParams.forEach((param) => url.searchParams.delete(param));
+    url.hash = "";
+    if ((url.protocol === "https:" && url.port === "443") || (url.protocol === "http:" && url.port === "80")) {
+      url.port = "";
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return String(value || "").trim();
+  }
+}
+
+function applyTimeFields(item) {
+  const ingestedAt = item.ingestedAt || new Date().toISOString();
+  const publishedTs = item.publishedTs || publishedTime(item);
+  const ingestedTs = parseDateValue(ingestedAt)?.getTime() || Date.now();
+  const basis = publishedTs ? "published" : "ingested";
+
+  return {
+    ...item,
+    publishedTs,
+    ingestedAt,
+    ingestedTs,
+    timeBasis: basis,
+    time: relativeTime(publishedTs ? item.publishedAt : ingestedAt),
+  };
+}
+
 function normalizeHeadline(value = "") {
   return value
     .toLowerCase()
@@ -996,6 +1036,8 @@ function toNewsItem(item, index) {
     url: item.link,
     publishedAt: item.publishedAt,
     publishedTs: publishedTime(item),
+    sourceTier: sourceTierFor(item.source),
+    sourceType: item.sourceType || "news_feed",
   };
 }
 
@@ -1031,6 +1073,46 @@ const WATCHLIST_ENTITIES = [
   { name: "SBI", group: "Bank", keywords: ["sbi", "state bank of india"] },
   { name: "Axis Bank", group: "Bank", keywords: ["axis bank"] },
 ];
+
+const ENTITY_MASTER = (() => {
+  const baseEntities = WATCHLIST_ENTITIES.map((entity) => ({
+    name: entity.name,
+    slug: slugify(entity.name),
+    keywords: entity.keywords,
+  }));
+
+  const listedEntities = [...new Set(Object.values(BSE_BFSI_CODES))]
+    .filter((name) => !baseEntities.some((entity) => entity.name === name))
+    .map((name) => ({
+      name,
+      slug: slugify(name),
+      keywords: [name.toLowerCase()],
+    }));
+
+  return [...baseEntities, ...listedEntities];
+})();
+
+function extractEntities(text = "") {
+  const lower = text.toLowerCase();
+  return ENTITY_MASTER
+    .filter((entity) => entity.keywords.some((keyword) => lower.includes(keyword)))
+    .map((entity) => entity.name)
+    .slice(0, 8);
+}
+
+function scoreReasoning(item, score, entities = []) {
+  const reasons = [
+    `${item.category || "Policy"} signal`,
+    `${item.source || "Unknown source"} source`,
+    item.risk === "High" ? "high-risk wording" : null,
+    item.sourceType === "exchange_filing" ? "primary filing" : null,
+    entities.length ? `entities: ${entities.slice(0, 3).join(", ")}` : null,
+    item.timeBasis === "ingested" ? "published time unavailable" : "published timestamp available",
+    `score ${score}`,
+  ].filter(Boolean);
+
+  return reasons.join("; ");
+}
 
 function materialScore(item) {
   const base = Number(item.score || 0);
@@ -1167,6 +1249,7 @@ async function fetchRssNews() {
   const health = results.map((result, index) => ({
     ...RSS_FEEDS[index],
     type: "RSS",
+    sourceTier: sourceTierFor(RSS_FEEDS[index].source),
     status: result.status === "fulfilled" ? "ok" : "error",
     itemCount: result.status === "fulfilled" ? result.value.length : 0,
     error: result.status === "rejected" ? result.reason?.message || "Source failed" : null,
@@ -1218,18 +1301,58 @@ async function fetchGdeltNews() {
 
 function dedupeAndRankNews(items) {
   const ranked = items
-    .map((item) => ({ ...item, score: relevanceScore(item) }))
+    .map((item) => {
+      const enrichedItem = applyTimeFields(item);
+      const normalizedUrl = normalizeUrl(enrichedItem.url);
+      const fingerprint = sha256([
+        normalizeHeadline(enrichedItem.headline),
+        normalizeHeadline(enrichedItem.tldr || ""),
+        normalizeHeadline(enrichedItem.company || ""),
+        enrichedItem.category || "",
+      ].join("|"));
+      const entities = extractEntities(`${enrichedItem.headline} ${enrichedItem.tldr} ${(enrichedItem.tags || []).join(" ")}`);
+      const score = relevanceScore(enrichedItem);
+
+      return {
+        ...enrichedItem,
+        normalizedUrl,
+        contentFingerprint: fingerprint,
+        entities,
+        affectedEntities: entities.reduce((acc, name) => ({ ...acc, [name]: score }), {}),
+        relatedSources: item.relatedSources || [enrichedItem.source],
+        score,
+        scoreReasoning: scoreReasoning(enrichedItem, score, entities),
+      };
+    })
     .sort((a, b) => b.score - a.score);
   const deduped = [];
 
   for (const item of ranked) {
-    const duplicate = deduped.some((candidate) => {
+    const duplicate = deduped.find((candidate) => {
       if ((candidate.dedupeKey || "") && candidate.dedupeKey === item.dedupeKey) return true;
-      if ((candidate.url || "") && candidate.url === item.url) return true;
-      return headlineSimilarity(candidate.headline, item.headline) >= 0.72;
+      if ((candidate.normalizedUrl || "") && candidate.normalizedUrl === item.normalizedUrl) return true;
+      if ((candidate.contentFingerprint || "") && candidate.contentFingerprint === item.contentFingerprint) return true;
+      return headlineSimilarity(candidate.headline, item.headline) >= 0.88;
     });
 
-    if (!duplicate) deduped.push(item);
+    if (!duplicate) {
+      deduped.push({
+        ...item,
+        sourceCount: 1,
+      });
+      continue;
+    }
+
+    duplicate.relatedSources = [...new Set([...(duplicate.relatedSources || [duplicate.source]), item.source])];
+    duplicate.sourceCount = duplicate.relatedSources.length;
+    duplicate.tags = [...new Set([...(duplicate.tags || []), ...(item.tags || [])])];
+    if ((item.publishedTs || 0) > (duplicate.publishedTs || 0)) {
+      duplicate.publishedAt = item.publishedAt || duplicate.publishedAt;
+    }
+    duplicate.publishedTs = Math.max(duplicate.publishedTs || 0, item.publishedTs || 0);
+    duplicate.timeBasis = duplicate.publishedTs ? "published" : duplicate.timeBasis;
+    duplicate.time = relativeTime(duplicate.publishedTs ? duplicate.publishedAt : duplicate.ingestedAt);
+    if (!duplicate.url && item.url) duplicate.url = item.url;
   }
 
   return deduped
@@ -1767,6 +1890,38 @@ function buildGovtSchemes(newsItems) {
     }));
 }
 
+function extractPenaltyAmount(text = "") {
+  const match = text.match(/(?:rs\.?|inr|₹)\s?([\d,.]+)\s?(crore|cr|lakh|lakhs)?/i);
+  if (!match) return null;
+  return `${match[1]} ${match[2] || ""}`.trim();
+}
+
+function buildPenaltyTracker(newsItems) {
+  return newsItems
+    .filter((item) => {
+      const text = `${item.headline} ${item.tldr} ${(item.tags || []).join(" ")}`.toLowerCase();
+      return ["penalty", "fine", "fined", "compliance action"].some((word) => text.includes(word));
+    })
+    .slice(0, 25)
+    .map((item) => ({
+      id: item.id,
+      entity: item.company || item.entities?.[0] || item.source,
+      regulator: item.source,
+      amount: extractPenaltyAmount(`${item.headline} ${item.tldr}`),
+      headline: item.headline,
+      category: item.category,
+      publishedAt: item.publishedAt || item.ingestedAt,
+      slug: item.slug,
+      url: item.url,
+    }));
+}
+
+function sourceTierFor(source) {
+  if (["BSE", "NSE", "RBI", "SEBI", "PIB"].includes(source)) return "primary";
+  if (String(source || "").startsWith("Google News")) return "aggregator";
+  return "direct";
+}
+
 async function buildIntelligencePayload() {
     const [rssNewsResult, gdeltNewsResult, marketResult, globalResult, archivedItems, bseResult, nseResult] = await Promise.allSettled([
       fetchRssNews(),
@@ -1802,9 +1957,11 @@ async function buildIntelligencePayload() {
     // Persist merged set back to Redis (fire-and-forget)
     if (freshDeduped.length) saveNewsArchive(freshDeduped);
 
-    const newsItems = dedupedNews.length
-      ? dedupedNews
-      : NEWS_ITEMS;
+    const newsItems = withArticleSlugs(
+      dedupedNews.length
+        ? dedupedNews
+        : NEWS_ITEMS
+    ).map(applyTimeFields);
     const apiHealth = [
       {
         source: "BSE Filings",
@@ -1857,6 +2014,7 @@ async function buildIntelligencePayload() {
     const alerts = buildAlerts(newsItems);
     const coLendingData = buildCoLendingData(newsItems);
     const govtSchemes = buildGovtSchemes(newsItems);
+    const penalties = buildPenaltyTracker(newsItems);
     const materialUpdates = buildMaterialUpdates(newsItems, market.peerData, resolvedRatings);
     const watchlist = buildWatchlist(newsItems, market.peerData, resolvedRatings);
 
@@ -1869,6 +2027,7 @@ async function buildIntelligencePayload() {
       globalData,
       coLendingData: coLendingData.length ? coLendingData : CO_LENDING_DATA,
       govtSchemes: govtSchemes.length ? govtSchemes : GOVT_SCHEMES,
+      penalties,
       materialUpdates,
       watchlist,
       dailyBrief: buildDailyBrief(newsItems, resolvedRatings),
@@ -1885,30 +2044,27 @@ async function buildIntelligencePayload() {
     };
 }
 
-export async function GET(request) {
-  const url = new URL(request.url);
-  const forceRefresh = url.searchParams.has("refresh");
-
+export async function getIntelligenceSnapshot({ forceRefresh = false } = {}) {
   if (!forceRefresh) {
     const cached = await readIntelligenceCache();
     if (cached) {
-      return Response.json({
+      return {
         ...cached,
         cache: {
           ...(cached.cache || {}),
           servedFromCache: true,
         },
-      });
+      };
     }
   }
 
   try {
     const payload = await buildIntelligencePayload();
-    return Response.json(await writeIntelligenceCache(payload));
+    return await writeIntelligenceCache(payload);
   } catch (error) {
     const cached = await readIntelligenceCache();
     if (cached) {
-      return Response.json({
+      return {
         ...cached,
         error: error.message,
         cache: {
@@ -1917,32 +2073,19 @@ export async function GET(request) {
           refreshFailed: true,
           refreshError: error.message,
         },
-      });
+      };
     }
 
-    return Response.json(fallbackPayload(error), { status: 200 });
+    return fallbackPayload(error);
   }
 }
 
-export async function POST() {
-  try {
-    const payload = await buildIntelligencePayload();
-    return Response.json(await writeIntelligenceCache(payload));
-  } catch (error) {
-    const cached = await readIntelligenceCache();
-    if (cached) {
-      return Response.json({
-        ...cached,
-        error: error.message,
-        cache: {
-          ...(cached.cache || {}),
-          servedFromCache: true,
-          refreshFailed: true,
-          refreshError: error.message,
-        },
-      });
-    }
+export async function GET(request) {
+  const url = new URL(request.url);
+  const forceRefresh = url.searchParams.has("refresh");
+  return Response.json(await getIntelligenceSnapshot({ forceRefresh }));
+}
 
-    return Response.json(fallbackPayload(error), { status: 200 });
-  }
+export async function POST() {
+  return Response.json(await getIntelligenceSnapshot({ forceRefresh: true }));
 }

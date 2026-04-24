@@ -31,7 +31,7 @@ async function loadNewsArchive() {
     const data = await redis.get(REDIS_NEWS_KEY);
     if (!Array.isArray(data)) return [];
     const cutoff = Date.now() - ARCHIVE_TTL_MS;
-    return data.filter((item) => item.publishedTs && item.publishedTs > cutoff);
+    return data.filter((item) => !shouldExcludePortalItem(item) && item.publishedTs && item.publishedTs > cutoff);
   } catch {
     return [];
   }
@@ -43,6 +43,7 @@ async function saveNewsArchive(freshItems) {
     const existing = await loadNewsArchive();
     const seenIds = new Set();
     const merged = [...freshItems, ...existing].filter((item) => {
+      if (shouldExcludePortalItem(item)) return false;
       if (!item.id || seenIds.has(item.id)) return false;
       seenIds.add(item.id);
       const cutoff = Date.now() - ARCHIVE_TTL_MS;
@@ -79,7 +80,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 8;
+const CACHE_VERSION = 9;
 
 const RSS_FEEDS = [
   {
@@ -1065,6 +1066,26 @@ function buildWhyMatters(category, source) {
   return `${notes[category] || notes.Policy} Source: ${source}.`;
 }
 
+const EXCLUDED_PORTAL_PATTERNS = [
+  /\bmoney market operations\b/i,
+];
+
+function shouldExcludePortalItem(item = {}) {
+  const text = [
+    item.title,
+    item.headline,
+    item.description,
+    item.tldr,
+    item.detail,
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return EXCLUDED_PORTAL_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function filterPortalItems(items = []) {
+  return items.filter((item) => !shouldExcludePortalItem(item));
+}
+
 function toNewsItem(item, index) {
   const combined = `${item.title} ${item.description}`;
   const category = classifyCategory(combined, item.defaultCategory);
@@ -1369,6 +1390,7 @@ async function fetchRssNews() {
       const text = `${item.title} ${item.description}`.toLowerCase();
       return RELEVANCE_WORDS.some((word) => text.includes(word));
     })
+    .filter((item) => !shouldExcludePortalItem(item))
     .filter((item) => {
       const key = item.link || item.title;
       if (seen.has(key)) return false;
@@ -1391,14 +1413,16 @@ async function fetchGdeltNews() {
 
   const json = await response.json();
   const articles = json?.articles || [];
-  return articles.map((article, index) => toNewsItem({
-    title: article.title,
-    description: article.seendate ? `Discovered by GDELT on ${article.seendate}.` : "Discovered by GDELT.",
-    link: article.url,
-    publishedAt: article.seendate,
-    source: article.sourceCommonName || "GDELT",
-    defaultCategory: "Policy",
-  }, index));
+  return articles
+    .map((article, index) => toNewsItem({
+      title: article.title,
+      description: article.seendate ? `Discovered by GDELT on ${article.seendate}.` : "Discovered by GDELT.",
+      link: article.url,
+      publishedAt: article.seendate,
+      source: article.sourceCommonName || "GDELT",
+      defaultCategory: "Policy",
+    }, index))
+    .filter((item) => !shouldExcludePortalItem(item));
 }
 
 async function fetchHtmlSourceNews() {
@@ -1416,7 +1440,9 @@ async function fetchHtmlSourceNews() {
   }));
 
   const health = results.map((result, index) => ({
-    ...HTML_SOURCES[index],
+    source: HTML_SOURCES[index].source,
+    url: HTML_SOURCES[index].url,
+    defaultCategory: HTML_SOURCES[index].defaultCategory,
     type: "HTML",
     sourceTier: "direct",
     status: result.status === "fulfilled" ? "ok" : "error",
@@ -1426,7 +1452,8 @@ async function fetchHtmlSourceNews() {
 
   const items = results
     .flatMap((result) => result.status === "fulfilled" ? result.value : [])
-    .map(toNewsItem);
+    .map(toNewsItem)
+    .filter((item) => !shouldExcludePortalItem(item));
 
   return { items, health };
 }
@@ -2166,7 +2193,9 @@ async function buildIntelligencePayload() {
     const htmlHealth = htmlNewsResult.status === "fulfilled"
       ? htmlNewsResult.value.health
       : HTML_SOURCES.map((source) => ({
-          ...source,
+          source: source.source,
+          url: source.url,
+          defaultCategory: source.defaultCategory,
           type: "HTML",
           sourceTier: "direct",
           status: "error",
@@ -2176,12 +2205,12 @@ async function buildIntelligencePayload() {
     const gdeltItems = gdeltNewsResult.status === "fulfilled" ? gdeltNewsResult.value : [];
     const bseItems = bseResult.status === "fulfilled" ? bseResult.value : [];
     const nseItems = nseResult.status === "fulfilled" ? nseResult.value : [];
-    const freshDeduped = dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...htmlItems, ...gdeltItems]);
+    const freshDeduped = filterPortalItems(dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...htmlItems, ...gdeltItems]));
 
     // Merge fresh news with 24h archive from Redis
-    const archive = archivedItems.status === "fulfilled" ? archivedItems.value : [];
+    const archive = archivedItems.status === "fulfilled" ? filterPortalItems(archivedItems.value) : [];
     const dedupedNews = freshDeduped.length
-      ? dedupeAndRankNews([...freshDeduped, ...archive])
+      ? filterPortalItems(dedupeAndRankNews([...freshDeduped, ...archive]))
       : archive;
 
     // Persist merged set back to Redis (fire-and-forget)
@@ -2190,7 +2219,7 @@ async function buildIntelligencePayload() {
     const newsItems = withArticleSlugs(
       dedupedNews.length
         ? dedupedNews
-        : NEWS_ITEMS
+        : filterPortalItems(NEWS_ITEMS)
     ).map(applyTimeFields);
     const apiHealth = [
       {

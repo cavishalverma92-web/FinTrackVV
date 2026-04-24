@@ -1,15 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FILTER_OPTIONS } from "../../data/appConfig";
 import { Flame, Clock, ExternalLink, RefreshCw } from "lucide-react";
-
-const FRESHNESS_OPTIONS = [
-  { label: "All", hours: null },
-  { label: "24h", hours: 24 },
-  { label: "7d", hours: 24 * 7 },
-  { label: "30d", hours: 24 * 30 },
-];
 
 function Tag({ label, color = "var(--accent-blue)" }) {
   return (
@@ -82,12 +75,6 @@ function itemMatchesSearch(item, query) {
     item.risk,
     ...(item.tags || []),
   ].join(" ").toLowerCase().includes(normalized);
-}
-
-function itemMatchesFreshness(item, hours) {
-  if (!hours) return true;
-  if (!item.publishedTs) return false;
-  return Date.now() - item.publishedTs <= hours * 60 * 60 * 1000;
 }
 
 const SEGMENT_KEYWORDS = {
@@ -174,7 +161,6 @@ export default function NewsFeed({
   newsItems = [],
   dataStatus = "ready",
   dataError,
-  sources,
   updatedAt,
   cache,
   searchQuery = "",
@@ -183,23 +169,10 @@ export default function NewsFeed({
   onRefresh,
 }) {
   const [filter, setFilter] = useState("All");
-  const [freshness, setFreshness] = useState(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("newsFreshness");
-    if (saved !== null) setFreshness(saved === "null" ? null : Number(saved));
-  }, []);
-
-  function handleFreshnessChange(hours) {
-    setFreshness(hours);
-    localStorage.setItem("newsFreshness", hours === null ? "null" : String(hours));
-  }
 
   const filteredNews = newsItems
     .filter((item) => itemMatchesSegment(item, filter))
-    .filter((item) => itemMatchesFreshness(item, freshness))
     .filter((item) => itemMatchesSearch(item, searchQuery));
-  const sourceCount = (sources?.rss?.length || 0) + (sources?.apis?.length || 0);
   const updatedLabel = formatUpdatedAt(updatedAt);
 
   return (
@@ -254,31 +227,13 @@ export default function NewsFeed({
         ))}
       </div>
 
-      <div className="flex items-center gap-2 mb-5 flex-wrap">
-        <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">
-          Freshness
-        </span>
-        {FRESHNESS_OPTIONS.map((option) => (
-          <button
-            key={option.label}
-            onClick={() => handleFreshnessChange(option.hours)}
-            className={`
-              px-3 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition-all border
-              ${freshness === option.hours
-                ? "bg-[var(--accent-blue)] text-white border-[var(--accent-blue)]"
-                : "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
-              }
-            `}
-          >
-            {option.label}
-          </button>
-        ))}
-        {searchQuery.trim() && (
-          <span className="text-[11px] text-[var(--text-dim)] ml-1">
+      {searchQuery.trim() && (
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <span className="text-[11px] text-[var(--text-dim)]">
             Search: "{searchQuery.trim()}"
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {filteredNews.map((item, index) => (
@@ -366,7 +321,7 @@ export default function NewsFeed({
           <div className="text-center py-12 text-[var(--text-dim)]">
             <p className="text-3xl mb-3 opacity-20">⌀</p>
             <p className="text-sm font-semibold">No items match the current filters</p>
-            <p className="text-xs mt-1 opacity-70">Try adjusting the segment, freshness, or search query</p>
+            <p className="text-xs mt-1 opacity-70">Try adjusting the segment or search query</p>
           </div>
         )}
       </div>

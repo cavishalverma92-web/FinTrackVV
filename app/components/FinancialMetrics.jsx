@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, FileText } from "lucide-react";
+import { ExternalLink, FileText, RefreshCw } from "lucide-react";
 
 function Sparkline({ data = [], color, width = 80, height = 24 }) {
   const clean = data.length ? data.map((item) => Number(item || 0)) : [0, 0];
@@ -89,6 +89,16 @@ function formatRsCr(value) {
   return `Rs ${number.toFixed(0)} Cr`;
 }
 
+function formatUpdatedAt(value) {
+  if (!value) return "Not refreshed yet";
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function median(values) {
   const clean = values.map(Number).filter(Boolean).sort((a, b) => a - b);
   if (!clean.length) return 0;
@@ -152,7 +162,14 @@ function RadarCard({ item }) {
   );
 }
 
-export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) {
+export default function FinancialMetrics({
+  sectorMetrics = [],
+  peerData = [],
+  updatedAt,
+  cache,
+  dataStatus = "ready",
+  onRefresh,
+}) {
   const radar = buildRadar(peerData);
   const allROA = peerData.map((p) => p.roa);
   const allROE = peerData.map((p) => p.roe);
@@ -167,19 +184,44 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
   const roaCoverage = peerData.filter((peer) => peer.roa).length;
   const deckCoverage = peerData.filter((peer) => peer.presentationUrl).length;
   const highConfidence = peerData.filter((peer) => peer.metricsConfidence === "High").length;
+  const isLoading = dataStatus === "loading";
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-5">
-        <h2 className="text-lg font-bold font-display tracking-tight">
-          Financial Services Metrics
-        </h2>
-        <p className="text-xs text-[var(--text-dim)] mt-1">
-          Market data · Loan Book (AUM) · ROA · BSE investor decks · Screener ratios
-        </p>
+      <div className="mb-5 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold font-display tracking-tight">
+            Financial Services Metrics
+          </h2>
+          <p className="text-xs text-[var(--text-dim)] mt-1">
+            Market data / Loan Book (AUM) / ROA / BSE investor decks / Screener ratios
+          </p>
+          <p className="text-[10px] text-[var(--text-dim)] mt-1 font-mono">
+            Updated {formatUpdatedAt(updatedAt)}
+            {cache?.servedFromCache ? " / served from latest cache" : ""}
+          </p>
+        </div>
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-sm bg-[var(--accent-burgundy)] text-white text-[11px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+          >
+            <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+            Refresh Financials
+          </button>
+        )}
       </div>
 
-      <div className="flex gap-3 mb-6 flex-wrap">
+      {!peerData.length && (
+        <div className="p-6 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] text-sm text-[var(--text-secondary)]">
+          Financial metrics are not available in the current snapshot. Use Refresh Financials to rebuild the market-data payload.
+        </div>
+      )}
+
+      {!!peerData.length && (
+        <>
+          <div className="flex gap-3 mb-6 flex-wrap">
         {sectorMetrics.map((metric, index) => (
           <MetricCard key={index} metric={metric} />
         ))}
@@ -359,6 +401,8 @@ export default function FinancialMetrics({ sectorMetrics = [], peerData = [] }) 
           </table>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

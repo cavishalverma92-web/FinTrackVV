@@ -2,6 +2,7 @@ import DashboardClient from "./components/DashboardClient";
 import { getIntelligenceSnapshot } from "./api/intelligence/route";
 
 export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "FinServTracker | Indian Lending Intelligence Feed",
@@ -20,6 +21,6 @@ export const metadata = {
 };
 
 export default async function Page() {
-  const intelligence = await getIntelligenceSnapshot();
+  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
   return <DashboardClient initialIntelligence={intelligence} />;
 }

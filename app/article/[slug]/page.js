@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getIntelligenceSnapshot } from "../../api/intelligence/route";
 
 export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 function articleMetadata(item) {
   const description = item.tldr || item.whyMatters || item.headline;
@@ -25,7 +26,7 @@ function articleMetadata(item) {
 }
 
 export async function generateMetadata({ params }) {
-  const intelligence = await getIntelligenceSnapshot();
+  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
   const article = intelligence.newsItems?.find((item) => item.slug === params.slug);
   if (!article) {
     return {
@@ -36,7 +37,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ArticlePage({ params }) {
-  const intelligence = await getIntelligenceSnapshot();
+  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
   const article = intelligence.newsItems?.find((item) => item.slug === params.slug);
 
   if (!article) notFound();

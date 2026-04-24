@@ -32,7 +32,7 @@ export default function Header({
             FinServTracker
           </h1>
           <p className="text-[9px] text-[var(--text-dim)] font-mono uppercase tracking-widest">
-            Indian financial intelligence
+            Financial Service Intelligence by Vishal Verma
           </p>
         </div>
       </div>

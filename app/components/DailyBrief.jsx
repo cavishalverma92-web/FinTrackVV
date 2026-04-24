@@ -33,7 +33,8 @@ function getRiskRatio(newsItems) {
 function getSegmentCounts(newsItems) {
   const counts = {};
   newsItems.forEach((item) => {
-    const key = item.sector || item.segment || "Others";
+    const raw = item.sector || item.segment || "Others";
+    const key = ["Vehicle Finance", "Payments", "Insurance"].includes(raw) ? "Others" : raw;
     counts[key] = (counts[key] || 0) + 1;
   });
   return counts;
@@ -47,10 +48,7 @@ const SEGMENT_COLORS = {
   HFCs: "var(--accent-amber)",
   MFIs: "var(--accent-red)",
   "Gold Loans": "#B7791F",
-  "Vehicle Finance": "#5EA7EF",
-  Payments: "var(--accent-blue)",
   Broking: "var(--accent-green)",
-  Insurance: "#8B6FBF",
   "Fintech Infra": "#8B6FBF",
   Others: "var(--text-dim)",
 };

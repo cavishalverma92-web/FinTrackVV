@@ -4,9 +4,10 @@ import { getIntelligenceSnapshot } from "../../api/intelligence/route";
 import { slugify } from "../../lib/content";
 
 export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
-  const intelligence = await getIntelligenceSnapshot();
+  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
   const entities = [...new Set((intelligence.newsItems || []).flatMap((item) => item.entities || []))];
   const entity = entities.find((name) => slugify(name) === params.slug);
 
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function EntityPage({ params }) {
-  const intelligence = await getIntelligenceSnapshot();
+  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
   const entities = [...new Set((intelligence.newsItems || []).flatMap((item) => item.entities || []))];
   const entity = entities.find((name) => slugify(name) === params.slug);
   if (!entity) notFound();

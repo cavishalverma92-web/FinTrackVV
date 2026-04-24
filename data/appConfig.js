@@ -8,10 +8,7 @@ export const FILTER_OPTIONS = [
   "HFCs",
   "MFIs",
   "Gold Loans",
-  "Vehicle Finance",
-  "Payments",
   "Broking",
-  "Insurance",
   "Others",
 ];
 

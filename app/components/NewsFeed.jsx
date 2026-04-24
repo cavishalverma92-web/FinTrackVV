@@ -150,10 +150,14 @@ const SEGMENT_KEYWORDS = {
   HFCs: ["housing finance", "home loan", "hfc", "aavas", "aptus", "home first", "can fin", "lic housing", "pnb housing"],
   MFIs: ["microfinance", "nbfc-mfi", "mfi", "creditaccess", "spandana", "fusion finance", "muthoot microfin", "arohan"],
   "Gold Loans": ["gold loan", "muthoot", "manappuram", "rupeek"],
-  "Vehicle Finance": ["vehicle finance", "commercial vehicle", "mahindra finance", "shriram finance"],
-  Payments: ["upi", "payment aggregator", "payments bank", "phonepe", "paytm", "mobikwik", "bharatpe"],
-  Broking: ["zerodha", "groww", "angel one", "broking", "broker"],
-  Insurance: ["insurance", "policybazaar", "pb fintech", "hdfc life", "sbi life", "star health"],
+  Broking: [
+    "zerodha", "groww", "upstox", "dhanhq", "dhan app", "dhan broking", "dhann",
+    "angel one", "angel broking", "nuvama", "kotak securities", "icici securities",
+    "icici direct", "hdfc securities", "motilal oswal", "sharekhan", "5paisa",
+    "five paisa", "geojit", "samco", "alice blue", "iifl securities",
+    "axis securities", "sbi securities", "broking", "brokerage", "stock broker",
+    "stockbroker", "trading app", "demat",
+  ],
 };
 
 function itemText(item) {

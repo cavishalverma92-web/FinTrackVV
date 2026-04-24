@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   classifyCategory,
+  classifySector,
+  classifySegment,
   dedupeAndRankNews,
   extractEntities,
   headlineSimilarity,
@@ -116,4 +118,29 @@ test("classification avoids false credit rating from broad stock market downgrad
 test("extractEntities avoids Bank of India false positive inside Reserve Bank of India", () => {
   const entities = extractEntities("Reserve Bank of India releases underwriting auction result");
   assert.ok(!entities.includes("Bank of India"));
+});
+
+test("broking taxonomy captures new-age and traditional brokers", () => {
+  assert.equal(classifySector("Groww Zerodha Upstox and Dhan report higher active traders", "Policy"), "Broking");
+  assert.equal(classifySector("Kotak Securities and ICICI Securities update brokerage platforms", "Policy"), "Broking");
+  assert.equal(classifySegment("Groww and Zerodha broking update", "Policy"), "Others");
+
+  const entities = extractEntities("Upstox, Zerodha, Groww and Kotak Securities launch new broking tools");
+  assert.ok(entities.includes("Upstox"));
+  assert.ok(entities.includes("Zerodha"));
+  assert.ok(entities.includes("Groww"));
+  assert.ok(entities.includes("Kotak Securities"));
+
+  assert.equal(isFinancialServicesMaterial({
+    source: "Google News Broking",
+    title: "Groww Zerodha and Upstox report active user growth",
+    description: "Indian stock broker and trading app update",
+    defaultCategory: "Policy",
+  }), true);
+});
+
+test("vehicle finance payments and insurance roll into Others segment", () => {
+  assert.equal(classifySegment("Shriram Finance reports vehicle finance growth", "Earnings"), "Others");
+  assert.equal(classifySegment("PhonePe payment aggregator update from RBI", "Regulation"), "Others");
+  assert.equal(classifySegment("IRDAI issues insurance broker circular", "Regulation"), "Others");
 });

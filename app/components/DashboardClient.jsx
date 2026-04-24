@@ -38,6 +38,7 @@ const INITIAL_DATA = {
 
 const AUTO_REFRESH_MS = 15 * 60 * 1000;
 const STALE_ON_LOAD_MS = 20 * 60 * 1000;
+const SECTION_STALE_MS = 10 * 60 * 1000;
 
 function inferDataStatus(data) {
   return data?.cache?.refreshFailed || data?.error ? "fallback" : "ready";
@@ -114,6 +115,12 @@ export default function DashboardClient({ initialIntelligence }) {
     document.documentElement.classList.toggle("dark", darkMode);
     localStorage.setItem("darkMode", darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (activeTab !== "feed" && isSnapshotStale(intelligenceRef.current, SECTION_STALE_MS)) {
+      loadIntelligence(true);
+    }
+  }, [activeTab, loadIntelligence]);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -245,6 +252,10 @@ export default function DashboardClient({ initialIntelligence }) {
               <FinancialMetrics
                 sectorMetrics={intelligence.sectorMetrics}
                 peerData={intelligence.peerData}
+                updatedAt={intelligence.updatedAt}
+                cache={intelligence.cache}
+                dataStatus={dataStatus}
+                onRefresh={() => loadIntelligence(true)}
               />
               <WatchlistPanel watchlist={intelligence.watchlist} />
             </>

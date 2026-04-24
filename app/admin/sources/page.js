@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getIntelligenceSnapshot } from "../../api/intelligence/route";
 
 export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Sources Admin | FinServTracker",
@@ -9,7 +10,7 @@ export const metadata = {
 };
 
 export default async function SourcesAdminPage() {
-  const intelligence = await getIntelligenceSnapshot();
+  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
   const sources = intelligence.sourceHealth || [];
   const stats = intelligence.sourceStats;
 

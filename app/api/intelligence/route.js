@@ -80,7 +80,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 14;
+const CACHE_VERSION = 16;
 
 const RSS_FEEDS = [
   {
@@ -156,6 +156,11 @@ const RSS_FEEDS = [
   {
     source: "Google News Banks",
     url: "https://news.google.com/rss/search?q=India%20banks%20RBI%20lending%20credit%20HDFC%20ICICI%20SBI%20Axis&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Broking",
+    url: "https://news.google.com/rss/search?q=%28Groww%20OR%20Zerodha%20OR%20Upstox%20OR%20Dhan%20OR%20%22Angel%20One%22%20OR%20Nuvama%20OR%20%22Kotak%20Securities%22%20OR%20%22ICICI%20Securities%22%20OR%20%22HDFC%20Securities%22%20OR%20%22Motilal%20Oswal%22%20OR%20Sharekhan%20OR%20%225paisa%22%29%20%28broking%20OR%20brokerage%20OR%20stockbroker%20OR%20%22trading%20app%22%20OR%20demat%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Policy",
   },
   {
@@ -608,13 +613,13 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-async function readIntelligenceCache() {
+async function readIntelligenceCache({ ignoreTtl = false } = {}) {
   try {
     const raw = await readFile(CACHE_FILE, "utf8");
     const payload = JSON.parse(raw);
     if (payload?.cacheVersion !== CACHE_VERSION) return null;
     const savedAt = payload.cache?.savedAt || payload.cache?.refreshedAt || null;
-    if (savedAt && Date.now() - new Date(savedAt).getTime() > CACHE_TTL_MS) return null;
+    if (!ignoreTtl && savedAt && Date.now() - new Date(savedAt).getTime() > CACHE_TTL_MS) return null;
     return payload;
   } catch {
     return null;
@@ -733,6 +738,10 @@ const RELEVANCE_WORDS = [
   "liquidity", "capital adequacy", "car", "tier 1", "tier 2",
   "provisioning", "write-off", "recovery", "collection",
   "interest income", "net income", "disbursement", "aum",
+  "zerodha", "groww", "upstox", "dhanhq", "dhan app", "dhan broking", "dhann",
+  "angel one", "angel broking", "nuvama", "kotak securities", "icici securities",
+  "icici direct", "hdfc securities", "motilal oswal", "sharekhan", "5paisa",
+  "geojit", "samco", "stock broker", "stockbroker", "brokerage", "trading app",
 ];
 
 const RATING_AGENCY_TERMS = [
@@ -746,7 +755,8 @@ const BFSI_ENTITY_TERMS = [
   "cooperative bank", "housing finance", "hfc", "microfinance", "mfi", "gold loan",
   "vehicle finance", "msme lending", "consumer lending", "personal loan", "credit card",
   "digital lending", "digital lender", "fintech lender", "payments bank", "payment aggregator",
-  "payment gateway", "upi", "wealthtech", "broking", "stock broker", "insurance", "asset management",
+  "payment gateway", "upi", "wealthtech", "broking", "brokerage", "stock broker", "stockbroker",
+  "trading app", "discount broker", "full-service broker", "demat", "insurance", "asset management",
   "amc", "mutual fund", "lending service provider", "lsp", "dlg", "co-lending", "co lending",
   "loan book", "aum", "gnpa", "nnpa", "capital adequacy", "provisioning", "collection efficiency",
   "disbursement", "asset quality", "cost of funds", "credit cost",
@@ -813,6 +823,7 @@ const SOURCE_WEIGHTS = {
   "Google News NBFC": 18,
   "Google News Digital Lending": 18,
   "Google News Banks": 18,
+  "Google News Broking": 20,
   "Google News Financial Services": 16,
   "Google News Business Standard": 18,
   "Google News Financial Express": 16,
@@ -980,7 +991,7 @@ export function classifyCategory(text, fallback) {
   return matchedCategory || normalizedFallback || "Policy";
 }
 
-function classifySector(text, category) {
+export function classifySector(text, category) {
   const lower = text.toLowerCase();
 
   if (["gold loan", "muthoot", "manappuram", "rupeek"].some((word) => lower.includes(word))) return "Gold Loans";
@@ -1052,18 +1063,24 @@ function classifySector(text, category) {
   ].some((word) => lower.includes(word))) return "Banks";
 
   if (["upi", "payment aggregator", "payment gateway", "payments bank", "phonepe", "paytm", "mobikwik", "bharatpe"].some((word) => lower.includes(word))) return "Payments";
-  if (["zerodha", "groww", "angel one", "nuvama", "broking", "broker"].some((word) => lower.includes(word))) return "Broking";
+  if ([
+    "zerodha", "groww", "upstox", "dhanhq", "dhan app", "dhan broking", "dhann", "angel one", "angel broking",
+    "nuvama", "kotak securities", "icici securities", "hdfc securities", "motilal oswal",
+    "sharekhan", "5paisa", "five paisa", "geojit", "samco", "alice blue",
+    "iifl securities", "axis securities", "sbi securities", "edelweiss broking",
+    "broking", "brokerage", "stock broker", "stockbroker", "trading app", "demat",
+  ].some((word) => lower.includes(word))) return "Broking";
   if (["insurance", "insurtech", "policybazaar", "pb fintech", "hdfc life", "sbi life", "star health"].some((word) => lower.includes(word))) return "Insurance";
   if (["asset management", "mutual fund", "amc", "hdfc amc", "nippon india amc", "uti amc"].some((word) => lower.includes(word))) return "Asset Management";
 
   return "Others";
 }
 
-function classifySegment(text, category) {
+export function classifySegment(text, category) {
   const sector = classifySector(text, category);
-  if (["HFCs", "MFIs", "Gold Loans", "Vehicle Finance"].includes(sector)) return "NBFCs";
+  if (["HFCs", "MFIs", "Gold Loans"].includes(sector)) return "NBFCs";
   if (sector === "Fintech Infra") return "AI & Tech";
-  if (["Payments", "Broking", "Insurance", "Asset Management"].includes(sector)) return "Others";
+  if (["Vehicle Finance", "Payments", "Broking", "Insurance", "Asset Management"].includes(sector)) return "Others";
   return sector;
 }
 
@@ -1266,7 +1283,7 @@ export function isFinancialServicesMaterial(item = {}) {
   if (hasRatingAgency) return hasCoreBfsiTerm || hasKnownEntity;
   if (hasKnownEntity && highSignalEvent) return true;
   if (hasCoreBfsiTerm && highSignalEvent) return true;
-  return hasCoreBfsiTerm && ["ET BFSI", "BusinessLine", "Financial Express Direct", "Moneycontrol Banks Direct"].includes(source);
+  return hasCoreBfsiTerm && ["ET BFSI", "BusinessLine", "Financial Express Direct", "Moneycontrol Banks Direct", "Google News Broking"].includes(source);
 }
 
 function filterPortalItems(items = []) {
@@ -1356,7 +1373,15 @@ const WATCHLIST_ENTITIES = [
   { name: "Paytm", group: "Payments", keywords: ["paytm", "one 97 communications"] },
   { name: "Groww", group: "Broking", keywords: ["groww"] },
   { name: "Zerodha", group: "Broking", keywords: ["zerodha"] },
+  { name: "Upstox", group: "Broking", keywords: ["upstox", "rksv"] },
+  { name: "Dhan", group: "Broking", keywords: ["dhanhq", "dhan app", "dhan broking", "raise financial services"] },
   { name: "Angel One", group: "Broking", keywords: ["angel one", "angel broking"] },
+  { name: "Kotak Securities", group: "Broking", keywords: ["kotak securities"] },
+  { name: "ICICI Securities", group: "Broking", keywords: ["icici securities", "icici direct"] },
+  { name: "HDFC Securities", group: "Broking", keywords: ["hdfc securities"] },
+  { name: "Motilal Oswal", group: "Broking", keywords: ["motilal oswal"] },
+  { name: "Sharekhan", group: "Broking", keywords: ["sharekhan"] },
+  { name: "5paisa", group: "Broking", keywords: ["5paisa", "five paisa"] },
   { name: "HDFC Bank", group: "Bank", keywords: ["hdfc bank"] },
   { name: "ICICI Bank", group: "Bank", keywords: ["icici bank"] },
   { name: "SBI", group: "Bank", keywords: ["sbi", "state bank of india"] },
@@ -2568,9 +2593,9 @@ async function buildIntelligencePayload() {
     };
 }
 
-export async function getIntelligenceSnapshot({ forceRefresh = false } = {}) {
+export async function getIntelligenceSnapshot({ forceRefresh = false, allowStale = false } = {}) {
   if (!forceRefresh) {
-    const cached = await readIntelligenceCache();
+    const cached = await readIntelligenceCache({ ignoreTtl: allowStale });
     if (cached) {
       return {
         ...cached,
@@ -2586,7 +2611,7 @@ export async function getIntelligenceSnapshot({ forceRefresh = false } = {}) {
     const payload = await buildIntelligencePayload();
     return await writeIntelligenceCache(payload);
   } catch (error) {
-    const cached = await readIntelligenceCache();
+    const cached = await readIntelligenceCache({ ignoreTtl: true });
     if (cached) {
       return {
         ...cached,

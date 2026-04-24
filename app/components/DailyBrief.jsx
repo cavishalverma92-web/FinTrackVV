@@ -55,7 +55,6 @@ function getMacroSnippet(globalData = []) {
   return [usdInr, repo, us10y].filter(Boolean).slice(0, 3);
 }
 
-// Urgency style per bucket index (0 = freshest)
 const BUCKET_STYLES = [
   { border: "#F59E0B", bg: "rgba(245,158,11,0.06)", labelColor: "#F59E0B" },
   { border: "var(--accent-blue)", bg: "rgba(77,163,255,0.06)", labelColor: "var(--accent-blue)" },
@@ -68,6 +67,17 @@ const RISK_COLORS = {
   Medium: { color: "var(--accent-amber)", bg: "rgba(245,158,11,0.12)" },
   Low: { color: "var(--text-dim)", bg: "var(--bg-primary)" },
 };
+
+function formatRatingEntry(entry) {
+  if (!entry) return "";
+  if (typeof entry === "string") return entry;
+
+  const entity = entry.entity || "Entity";
+  const from = entry.from || "-";
+  const to = entry.to || "-";
+  const agency = entry.agency ? ` (${entry.agency})` : "";
+  return `${entity}: ${from} -> ${to}${agency}`;
+}
 
 export default function DailyBrief({
   newsItems = [],
@@ -104,30 +114,28 @@ export default function DailyBrief({
     mood === "clear" ? "Clear outlook" :
     "Balanced signals";
 
-  // Time buckets from backend, fall back to empty
-  const timeBuckets = brief?.timeBuckets || [];
+  const timeBuckets = Array.isArray(brief?.timeBuckets) ? brief.timeBuckets : [];
 
-  // Ratings: prefer brief.ratingSnapshot, fall back to ratingChanges prop
-  const downgrades = brief?.ratingSnapshot?.downgrades?.length
-    ? brief.ratingSnapshot.downgrades
-    : ratingChanges.filter((r) => r.direction === "down").slice(0, 3).map((r) => `${r.entity}: ${r.from} → ${r.to} (${r.agency})`);
-  const upgrades = brief?.ratingSnapshot?.upgrades?.length
-    ? brief.ratingSnapshot.upgrades
-    : ratingChanges.filter((r) => r.direction === "up").slice(0, 3).map((r) => `${r.entity}: ${r.from} → ${r.to} (${r.agency})`);
+  const downgrades = Array.isArray(brief?.ratingSnapshot?.downgrades) && brief.ratingSnapshot.downgrades.length
+    ? brief.ratingSnapshot.downgrades.map(formatRatingEntry).filter(Boolean)
+    : ratingChanges.filter((r) => r.direction === "down").slice(0, 3).map(formatRatingEntry).filter(Boolean);
+  const upgrades = Array.isArray(brief?.ratingSnapshot?.upgrades) && brief.ratingSnapshot.upgrades.length
+    ? brief.ratingSnapshot.upgrades.map(formatRatingEntry).filter(Boolean)
+    : ratingChanges.filter((r) => r.direction === "up").slice(0, 3).map(formatRatingEntry).filter(Boolean);
 
-  // Risk signals and opportunities from backend or fallback
-  const riskSignals = brief?.riskSignals?.length
+  const riskSignals = Array.isArray(brief?.riskSignals) && brief.riskSignals.length
     ? brief.riskSignals
     : newsItems.filter((item) => item.risk === "High").slice(0, 4).map((item) => item.headline);
-  const opportunityItems = brief?.opportunities?.length
+  const opportunityItems = Array.isArray(brief?.opportunities) && brief.opportunities.length
     ? brief.opportunities
-    : newsItems.filter((item) => item.risk !== "High" && ["Fundraise", "Partnership"].includes(item.category)).slice(0, 4).map((item) => item.headline);
+    : newsItems
+        .filter((item) => item.risk !== "High" && ["Fundraise", "Partnership"].includes(item.category))
+        .slice(0, 4)
+        .map((item) => item.headline);
 
   return (
     <div className="max-w-3xl animate-fade-in">
       <div className="p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] mb-5">
-
-        {/* ── Header ── */}
         <div className="flex items-start justify-between mb-1">
           <div>
             <p className="text-xs text-[var(--text-dim)] font-mono mb-0.5">{greeting}, Vishal</p>
@@ -141,7 +149,6 @@ export default function DailyBrief({
           </span>
         </div>
 
-        {/* ── Stats bar ── */}
         <div className="flex items-center gap-4 mt-4 mb-5 p-3 rounded-lg bg-[var(--bg-primary)] flex-wrap">
           <Stat label="Articles" value={newsItems.length} />
           <div className="w-px h-6 bg-[var(--border-subtle)] hidden sm:block" />
@@ -156,11 +163,10 @@ export default function DailyBrief({
             <span className="text-[11px] font-semibold font-mono" style={{ color: moodColor }}>{moodLabel}</span>
           </div>
           {dataStatus === "loading" && (
-            <span className="text-[10px] text-[var(--text-dim)] font-mono ml-auto">Refreshing…</span>
+            <span className="text-[10px] text-[var(--text-dim)] font-mono ml-auto">Refreshing...</span>
           )}
         </div>
 
-        {/* ── Segment Heat Bar ── */}
         {newsItems.length > 0 && (
           <div className="mb-6">
             <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-2">
@@ -192,7 +198,6 @@ export default function DailyBrief({
           </div>
         )}
 
-        {/* ── Macro Corner ── */}
         {macroSnippet.length > 0 && (
           <div className="mb-6 p-4 rounded-xl bg-[var(--bg-primary)] border-l-[3px] border-[var(--accent-blue)]">
             <div className="flex items-center gap-2 mb-2">
@@ -209,8 +214,8 @@ export default function DailyBrief({
                     className="font-bold"
                     style={{
                       color: item.signal === "Caution" ? "var(--accent-amber)" :
-                             item.signal === "Positive" ? "var(--accent-green)" :
-                             "var(--text-primary)",
+                        item.signal === "Positive" ? "var(--accent-green)" :
+                          "var(--text-primary)",
                     }}
                   >
                     {item.value}
@@ -221,7 +226,6 @@ export default function DailyBrief({
           </div>
         )}
 
-        {/* ── Time-Bucketed Intelligence ── */}
         {timeBuckets.length > 0 ? (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-4">
@@ -235,7 +239,7 @@ export default function DailyBrief({
                 const style = BUCKET_STYLES[Math.min(idx, BUCKET_STYLES.length - 1)];
                 return (
                   <TimeBucket
-                    key={bucket.label}
+                    key={bucket.label || `${bucket.count}-${idx}`}
                     bucket={bucket}
                     style={style}
                     onSelectNews={onSelectNews}
@@ -245,7 +249,6 @@ export default function DailyBrief({
             </div>
           </div>
         ) : (
-          /* Fallback: show top news if no buckets yet */
           newsItems.length > 0 && (
             <div className="mb-6 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
               <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-2">
@@ -258,7 +261,7 @@ export default function DailyBrief({
                     onClick={() => onSelectNews?.(item)}
                     className={`text-xs text-[var(--text-primary)] leading-relaxed flex gap-2 ${onSelectNews ? "cursor-pointer hover:opacity-80" : ""}`}
                   >
-                    <span className="text-[var(--accent-green)] flex-shrink-0 mt-0.5">·</span>
+                    <span className="text-[var(--accent-green)] flex-shrink-0 mt-0.5">.</span>
                     {item.headline}
                   </li>
                 ))}
@@ -267,7 +270,6 @@ export default function DailyBrief({
           )
         )}
 
-        {/* ── Credit Rating Actions ── */}
         {(downgrades.length > 0 || upgrades.length > 0) && (
           <div className="mb-6">
             <h3 className="text-[10px] font-black text-[var(--text-dim)] uppercase tracking-widest font-mono mb-3">
@@ -284,7 +286,6 @@ export default function DailyBrief({
           </div>
         )}
 
-        {/* ── Risk Signals ── */}
         <SignalList
           title="Risk Signals"
           icon={AlertTriangle}
@@ -294,7 +295,6 @@ export default function DailyBrief({
           empty="No high-risk live signals in the current source refresh."
         />
 
-        {/* ── Opportunities ── */}
         <SignalList
           title="Opportunities"
           icon={TrendingUp}
@@ -312,9 +312,13 @@ function TimeBucket({ bucket, style, onSelectNews }) {
   return (
     <div
       className="rounded-xl border-l-[3px] overflow-hidden"
-      style={{ borderLeftColor: style.border, backgroundColor: style.bg, border: `1px solid var(--border-subtle)`, borderLeftWidth: "3px", borderLeftColor: style.border }}
+      style={{
+        border: "1px solid var(--border-subtle)",
+        borderLeftWidth: "3px",
+        borderLeftColor: style.border,
+        backgroundColor: style.bg,
+      }}
     >
-      {/* Bucket header */}
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <span className="text-base leading-none">{bucket.icon}</span>
         <span className="text-[11px] font-black uppercase tracking-widest font-mono" style={{ color: style.labelColor }}>
@@ -325,18 +329,16 @@ function TimeBucket({ bucket, style, onSelectNews }) {
         </span>
       </div>
 
-      {/* Narrative summary */}
       {bucket.summary && (
         <p className="px-4 pb-3 text-[13px] text-[var(--text-primary)] leading-relaxed">
           {bucket.summary}
         </p>
       )}
 
-      {/* Top items */}
       {bucket.topItems?.length > 0 && (
         <div className="border-t border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]">
           {bucket.topItems.map((item, i) => (
-            <TopItem key={i} item={item} onSelectNews={onSelectNews} />
+            <TopItem key={`${item.id || item.headline || "item"}-${i}`} item={item} onSelectNews={onSelectNews} />
           ))}
         </div>
       )}
@@ -398,7 +400,7 @@ function RatingRow({ direction, text }) {
           backgroundColor: isUp ? "rgba(29,111,214,0.12)" : "rgba(217,74,93,0.12)",
         }}
       >
-        {isUp ? "↑ Upgrade" : "↓ Downgrade"}
+        {isUp ? "Upgrade" : "Downgrade"}
       </span>
       <span className="text-xs text-[var(--text-primary)] leading-snug">{text}</span>
     </div>
@@ -431,7 +433,7 @@ function SignalList({ title, icon: Icon, color, bg, items, empty }) {
       <ul className="space-y-2">
         {list.map((item, index) => (
           <li key={index} className="text-xs text-[var(--text-primary)] leading-relaxed flex gap-2">
-            <span className="flex-shrink-0 mt-0.5" style={{ color }}>·</span>
+            <span className="flex-shrink-0 mt-0.5" style={{ color }}>.</span>
             {item}
           </li>
         ))}

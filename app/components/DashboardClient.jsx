@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import NewsFeed from "./NewsFeed";
@@ -36,8 +36,19 @@ const INITIAL_DATA = {
   cache: null,
 };
 
+const AUTO_REFRESH_MS = 15 * 60 * 1000;
+const STALE_ON_LOAD_MS = 20 * 60 * 1000;
+
 function inferDataStatus(data) {
   return data?.cache?.refreshFailed || data?.error ? "fallback" : "ready";
+}
+
+function isSnapshotStale(data, maxAgeMs = STALE_ON_LOAD_MS) {
+  const timestamp = data?.updatedAt || data?.cache?.refreshedAt || data?.cache?.savedAt;
+  if (!timestamp) return true;
+  const updatedAt = new Date(timestamp).getTime();
+  if (!Number.isFinite(updatedAt)) return true;
+  return Date.now() - updatedAt > maxAgeMs;
 }
 
 export default function DashboardClient({ initialIntelligence }) {
@@ -50,6 +61,11 @@ export default function DashboardClient({ initialIntelligence }) {
   const [dataStatus, setDataStatus] = useState(initialIntelligence ? inferDataStatus(initialIntelligence) : "loading");
   const [dataError, setDataError] = useState(initialIntelligence?.error || null);
   const [searchQuery, setSearchQuery] = useState("");
+  const intelligenceRef = useRef(intelligence);
+
+  useEffect(() => {
+    intelligenceRef.current = intelligence;
+  }, [intelligence]);
 
   const loadIntelligence = useCallback(async (force = false) => {
     try {
@@ -69,9 +85,24 @@ export default function DashboardClient({ initialIntelligence }) {
   }, []);
 
   useEffect(() => {
-    if (!initialIntelligence) loadIntelligence();
-    const refreshId = window.setInterval(loadIntelligence, 15 * 60 * 1000);
-    return () => window.clearInterval(refreshId);
+    if (!initialIntelligence || isSnapshotStale(initialIntelligence)) loadIntelligence(true);
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "hidden") loadIntelligence(true);
+    };
+    const refreshOnFocus = () => {
+      if (isSnapshotStale(intelligenceRef.current)) loadIntelligence(true);
+    };
+
+    const refreshId = window.setInterval(refreshIfVisible, AUTO_REFRESH_MS);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    window.addEventListener("focus", refreshOnFocus);
+
+    return () => {
+      window.clearInterval(refreshId);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
   }, [initialIntelligence, loadIntelligence]);
 
   useEffect(() => {

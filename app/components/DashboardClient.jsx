@@ -25,10 +25,12 @@ const INITIAL_DATA = {
   globalData: [],
   coLendingData: [],
   govtSchemes: [],
+  penalties: [],
   materialUpdates: [],
   watchlist: [],
   dailyBrief: null,
   sources: null,
+  sourceStats: null,
   updatedAt: null,
   cache: null,
 };

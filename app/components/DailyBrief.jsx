@@ -226,6 +226,17 @@ export default function DailyBrief({
           </div>
         )}
 
+        {brief?.summary && (
+          <div className="mb-6 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+            <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest font-mono mb-2">
+              Boardroom Summary
+            </p>
+            <p className="text-sm text-[var(--text-primary)] leading-relaxed">
+              {brief.summary}
+            </p>
+          </div>
+        )}
+
         {timeBuckets.length > 0 ? (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-4">
@@ -302,6 +313,24 @@ export default function DailyBrief({
           bg="rgba(29,111,214,0.08)"
           items={opportunityItems}
           empty="No opportunity signals in the current source refresh."
+        />
+
+        <SignalList
+          title="Precedent"
+          icon={BarChart2}
+          color="var(--accent-blue)"
+          bg="rgba(77,163,255,0.08)"
+          items={brief?.precedent || []}
+          empty="No precedent notes built for the current brief."
+        />
+
+        <SignalList
+          title="Watch For"
+          icon={Clock}
+          color="var(--accent-amber)"
+          bg="rgba(245,158,11,0.08)"
+          items={brief?.watchFor || []}
+          empty="No near-term watch items in the current brief."
         />
       </div>
     </div>

@@ -1,3 +1,7 @@
+import { createHash } from "crypto";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import path from "path";
+import { Redis } from "@upstash/redis";
 import {
   ALERTS,
   CO_LENDING_DATA,
@@ -7,12 +11,8 @@ import {
   PEER_DATA,
   RATING_CHANGES,
   SECTOR_METRICS,
-} from "../../../data/mockData";
-import { createHash } from "crypto";
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
-import { Redis } from "@upstash/redis";
-import { slugify, withArticleSlugs } from "../../lib/content";
+} from "../../../data/mockData.js";
+import { slugify, withArticleSlugs } from "../../lib/content.js";
 
 const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
   ? new Redis({
@@ -22,6 +22,7 @@ const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_RE
   : null;
 
 const REDIS_NEWS_KEY = "lendingiq:news:archive";
+const REDIS_BRIEF_PREFIX = "lendingiq:brief:";
 const ARCHIVE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 async function loadNewsArchive() {
@@ -51,6 +52,24 @@ async function saveNewsArchive(freshItems) {
     await redis.set(REDIS_NEWS_KEY, merged, { ex: 25 * 60 * 60 });
   } catch {
     // fail silently — fresh items still served
+  }
+}
+
+async function loadCachedBrief(hash) {
+  if (!redis || !hash) return null;
+  try {
+    return await redis.get(`${REDIS_BRIEF_PREFIX}${hash}`);
+  } catch {
+    return null;
+  }
+}
+
+async function saveCachedBrief(hash, brief) {
+  if (!redis || !hash || !brief) return;
+  try {
+    await redis.set(`${REDIS_BRIEF_PREFIX}${hash}`, brief, { ex: 25 * 60 * 60 });
+  } catch {
+    // no-op
   }
 }
 
@@ -577,7 +596,7 @@ async function writeIntelligenceCache(payload) {
   return cachedPayload;
 }
 
-function fallbackPayload(error) {
+async function fallbackPayload(error) {
   const fallbackNewsItems = withArticleSlugs(NEWS_ITEMS).map(applyTimeFields);
   return {
     newsItems: fallbackNewsItems,
@@ -591,7 +610,7 @@ function fallbackPayload(error) {
     penalties: [],
     materialUpdates: buildMaterialUpdates(fallbackNewsItems, PEER_DATA, RATING_CHANGES),
     watchlist: buildWatchlist(fallbackNewsItems, PEER_DATA, RATING_CHANGES),
-    dailyBrief: buildDailyBrief(fallbackNewsItems, RATING_CHANGES),
+    dailyBrief: await buildDailyBrief(fallbackNewsItems, RATING_CHANGES),
     sources: {
       rss: RSS_FEEDS.map((feed) => ({ ...feed, type: "RSS", status: "fallback", itemCount: 0, error: error.message })),
       apis: [
@@ -875,7 +894,7 @@ function riskFor(text, category) {
   return "Low";
 }
 
-function impactFor(category, risk) {
+export function impactFor(category, risk) {
   if (risk === "High") return { nbfc: "High", digital: "Critical", investor: "High" };
   if (category === "Regulation") return { nbfc: "High", digital: "High", investor: "Medium" };
   if (category === "Credit Rating") return { nbfc: "High", digital: "Medium", investor: "High" };
@@ -918,7 +937,7 @@ function publishedTime(item) {
   return !date || Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
-function normalizeUrl(value = "") {
+export function normalizeUrl(value = "") {
   if (!value) return "";
   try {
     const url = new URL(value);
@@ -963,7 +982,7 @@ function tokenSet(value) {
   return new Set(normalizeHeadline(value).split(" ").filter((token) => token.length > 2));
 }
 
-function headlineSimilarity(a, b) {
+export function headlineSimilarity(a, b) {
   const left = tokenSet(a);
   const right = tokenSet(b);
   if (!left.size || !right.size) return 0;
@@ -1092,7 +1111,7 @@ const ENTITY_MASTER = (() => {
   return [...baseEntities, ...listedEntities];
 })();
 
-function extractEntities(text = "") {
+export function extractEntities(text = "") {
   const lower = text.toLowerCase();
   return ENTITY_MASTER
     .filter((entity) => entity.keywords.some((keyword) => lower.includes(keyword)))
@@ -1112,6 +1131,42 @@ function scoreReasoning(item, score, entities = []) {
   ].filter(Boolean);
 
   return reasons.join("; ");
+}
+
+function rebalanceSources(items, limit = 36) {
+  const primary = [];
+  const direct = [];
+  const aggregator = [];
+
+  items.forEach((item) => {
+    const tier = sourceTierFor(item.source);
+    if (tier === "primary") primary.push(item);
+    else if (tier === "direct") direct.push(item);
+    else aggregator.push(item);
+  });
+
+  const selected = [];
+  const addUntil = (pool, maxItems) => {
+    for (const item of pool) {
+      if (selected.length >= limit || maxItems <= 0) break;
+      selected.push(item);
+      maxItems -= 1;
+    }
+    return maxItems;
+  };
+
+  addUntil(primary, Math.min(primary.length, limit));
+  addUntil(direct, Math.min(direct.length, limit - selected.length));
+  addUntil(aggregator, Math.min(12, limit - selected.length));
+
+  if (selected.length < limit) {
+    for (const item of [...primary, ...direct, ...aggregator]) {
+      if (selected.length >= limit) break;
+      if (!selected.includes(item)) selected.push(item);
+    }
+  }
+
+  return selected;
 }
 
 function materialScore(item) {
@@ -1276,7 +1331,7 @@ async function fetchRssNews() {
     .sort((a, b) => publishedTime(b) - publishedTime(a));
 
   return {
-    items: relevant.slice(0, 36).map(toNewsItem),
+    items: rebalanceSources(relevant).map(toNewsItem),
     health,
   };
 }
@@ -1299,7 +1354,7 @@ async function fetchGdeltNews() {
   }, index));
 }
 
-function dedupeAndRankNews(items) {
+export function dedupeAndRankNews(items) {
   const ranked = items
     .map((item) => {
       const enrichedItem = applyTimeFields(item);
@@ -1797,11 +1852,65 @@ function buildTimeBuckets(newsItems) {
   }).filter(Boolean);
 }
 
-function buildDailyBrief(newsItems, ratingChanges) {
+function buildBriefHash(newsItems = [], ratingChanges = []) {
+  return sha256(JSON.stringify({
+    news: newsItems.slice(0, 12).map((item) => [item.id, item.headline, item.category, item.score, item.publishedAt]),
+    ratings: ratingChanges.slice(0, 6).map((item) => [item.entity, item.direction, item.agency, item.date]),
+  }));
+}
+
+function buildPrecedents(newsItems = []) {
+  return newsItems
+    .filter((item) => item.sourceType === "exchange_filing" || ["Regulation", "Credit Rating", "Risk Signal"].includes(item.category))
+    .slice(0, 3)
+    .map((item) => {
+      if (item.sourceType === "exchange_filing") {
+        return `${item.company || item.source}: official filing may move lenders from commentary into action mode.`;
+      }
+      if (item.category === "Regulation") {
+        return `${item.source}: similar regulatory notices usually translate into compliance and product-rule changes within one cycle.`;
+      }
+      if (item.category === "Credit Rating") {
+        return `${item.source}: rating actions often ripple into peer funding costs and debt market sentiment.`;
+      }
+      return `${item.headline}: risk signals like this tend to widen monitoring and underwriting scrutiny across peers.`;
+    });
+}
+
+function buildWatchFor(newsItems = []) {
+  const watchItems = newsItems
+    .filter((item) => item.risk === "High" || item.sourceType === "exchange_filing" || item.category === "Regulation")
+    .slice(0, 4);
+
+  return watchItems.map((item) => {
+    if (item.sourceType === "exchange_filing") {
+      return `Watch for follow-on disclosures or management commentary from ${item.company || item.source}.`;
+    }
+    if (item.category === "Regulation") {
+      return `Watch for lender responses, implementation dates, and second-order compliance cost impact.`;
+    }
+    return `Watch for whether ${item.entities?.[0] || item.source} turns this signal into ratings, collections, or provisioning pressure.`;
+  });
+}
+
+function buildBriefSummary(newsItems = []) {
+  const top = newsItems.slice(0, 4);
+  if (!top.length) return null;
+  return top
+    .map((item, index) => {
+      const prefix = index === 0 ? "What changed" : index === 1 ? "Why it matters" : "Also";
+      return `${prefix}: ${item.headline}.`;
+    })
+    .join(" ");
+}
+
+function buildDailyBriefPayload(newsItems, ratingChanges, hash) {
   const downgrades = ratingChanges.filter((r) => r.direction === "down");
   const upgrades = ratingChanges.filter((r) => r.direction === "up");
 
   return {
+    hash,
+    summary: buildBriefSummary(newsItems),
     timeBuckets: buildTimeBuckets(newsItems),
     riskSignals: newsItems
       .filter((item) => item.risk === "High" || item.category === "Risk Signal")
@@ -1815,7 +1924,19 @@ function buildDailyBrief(newsItems, ratingChanges) {
       downgrades: downgrades.slice(0, 3).map((r) => ({ entity: r.entity, from: r.from, to: r.to, agency: r.agency })),
       upgrades: upgrades.slice(0, 3).map((r) => ({ entity: r.entity, from: r.from, to: r.to, agency: r.agency })),
     },
+    precedent: buildPrecedents(newsItems),
+    watchFor: buildWatchFor(newsItems),
   };
+}
+
+async function buildDailyBrief(newsItems, ratingChanges) {
+  const hash = buildBriefHash(newsItems, ratingChanges);
+  const cachedBrief = await loadCachedBrief(hash);
+  if (cachedBrief) return cachedBrief;
+
+  const brief = buildDailyBriefPayload(newsItems, ratingChanges, hash);
+  await saveCachedBrief(hash, brief);
+  return brief;
 }
 
 function buildCoLendingData(newsItems) {
@@ -1922,6 +2043,26 @@ function sourceTierFor(source) {
   return "direct";
 }
 
+function buildSourceStats(sources = []) {
+  const counts = sources.reduce((acc, source) => {
+    const tier = source.sourceTier || "unknown";
+    acc[tier] = (acc[tier] || 0) + 1;
+    return acc;
+  }, {});
+  const total = sources.length || 1;
+  const aggregatorPct = Math.round(((counts.aggregator || 0) / total) * 100);
+  const directPct = Math.round((((counts.direct || 0) + (counts.primary || 0)) / total) * 100);
+
+  return {
+    totalSources: sources.length,
+    primarySources: counts.primary || 0,
+    directSources: counts.direct || 0,
+    aggregatorSources: counts.aggregator || 0,
+    directCoveragePct: directPct,
+    aggregatorDependencyPct: aggregatorPct,
+  };
+}
+
 async function buildIntelligencePayload() {
     const [rssNewsResult, gdeltNewsResult, marketResult, globalResult, archivedItems, bseResult, nseResult] = await Promise.allSettled([
       fetchRssNews(),
@@ -2017,6 +2158,8 @@ async function buildIntelligencePayload() {
     const penalties = buildPenaltyTracker(newsItems);
     const materialUpdates = buildMaterialUpdates(newsItems, market.peerData, resolvedRatings);
     const watchlist = buildWatchlist(newsItems, market.peerData, resolvedRatings);
+    const dailyBrief = await buildDailyBrief(newsItems, resolvedRatings);
+    const sourceStats = buildSourceStats([...rssHealth, ...apiHealth]);
 
     return {
       newsItems,
@@ -2030,12 +2173,13 @@ async function buildIntelligencePayload() {
       penalties,
       materialUpdates,
       watchlist,
-      dailyBrief: buildDailyBrief(newsItems, resolvedRatings),
+      dailyBrief,
       sources: {
         rss: rssHealth,
         apis: apiHealth,
       },
       sourceHealth: [...rssHealth, ...apiHealth],
+      sourceStats,
       updatedAt: new Date().toISOString(),
       cache: {
         cached: false,
@@ -2076,7 +2220,7 @@ export async function getIntelligenceSnapshot({ forceRefresh = false } = {}) {
       };
     }
 
-    return fallbackPayload(error);
+    return await fallbackPayload(error);
   }
 }
 

@@ -11,6 +11,7 @@ export const metadata = {
 export default async function SourcesAdminPage() {
   const intelligence = await getIntelligenceSnapshot();
   const sources = intelligence.sourceHealth || [];
+  const stats = intelligence.sourceStats;
 
   return (
     <main className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -22,6 +23,15 @@ export default async function SourcesAdminPage() {
         <p className="text-sm text-[var(--text-dim)] mb-8">
           Current source health and tiering from the latest intelligence snapshot.
         </p>
+
+        {stats && (
+          <div className="grid gap-3 md:grid-cols-4 mb-8">
+            <StatCard label="Total Sources" value={stats.totalSources} />
+            <StatCard label="Direct Coverage" value={`${stats.directCoveragePct}%`} />
+            <StatCard label="Aggregator Share" value={`${stats.aggregatorDependencyPct}%`} />
+            <StatCard label="Primary Sources" value={stats.primarySources} />
+          </div>
+        )}
 
         <div className="grid gap-3">
           {sources.map((source) => (
@@ -41,5 +51,14 @@ export default async function SourcesAdminPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] mb-2">{label}</p>
+      <p className="text-2xl font-bold">{value}</p>
+    </div>
   );
 }

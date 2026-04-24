@@ -93,6 +93,17 @@ export default async function ArticlePage({ params }) {
             </p>
           </section>
 
+          {article.scoreReasoning && (
+            <section className="mb-8">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-dim)] mb-3">
+                Score Reasoning
+              </h2>
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {article.scoreReasoning}
+              </p>
+            </section>
+          )}
+
           {article.tags?.length > 0 && (
             <section className="mb-8">
               <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-dim)] mb-3">
@@ -103,6 +114,21 @@ export default async function ArticlePage({ params }) {
                   <span key={tag} className="px-2 py-1 rounded bg-[var(--bg-primary)] text-[11px] font-mono text-[var(--text-secondary)]">
                     {tag}
                   </span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {article.entities?.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-dim)] mb-3">
+                Affected Entities
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {article.entities.map((entity) => (
+                  <Link key={entity} href={`/entity/${entity.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="px-2 py-1 rounded bg-[var(--bg-primary)] text-[11px] font-mono text-[var(--text-secondary)]">
+                    {entity}
+                  </Link>
                 ))}
               </div>
             </section>

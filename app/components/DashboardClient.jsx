@@ -177,7 +177,7 @@ export default function DashboardClient({ initialIntelligence }) {
           }}
         />
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {dataStatus === "loading" && intelligence.newsItems.length === 0 && (
             <div className="animate-pulse space-y-4">
               <div className="h-5 w-48 bg-[var(--bg-elevated)] rounded" />
@@ -195,7 +195,7 @@ export default function DashboardClient({ initialIntelligence }) {
           )}
 
           {activeTab === "feed" && (
-            <div className="flex gap-6 h-full">
+            <div className="flex gap-6 h-full max-w-[1560px]">
               <div className="flex-1 min-w-0">
                 <MaterialUpdates
                   updates={intelligence.materialUpdates}
@@ -277,7 +277,7 @@ export default function DashboardClient({ initialIntelligence }) {
       </div>
 
       {intelligence.sources && (
-        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-card)] px-6 py-2">
+        <div className="border-t border-[var(--border-subtle)] bg-[rgba(255,253,248,0.78)] px-6 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-[9px] font-black text-[var(--text-dim)] uppercase tracking-widest font-mono flex-shrink-0">
               Live Sources

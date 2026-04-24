@@ -7,35 +7,32 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Main background colors
         bg: {
-          primary: '#0A0E17',    // Darkest background
-          card: '#111827',       // Card background
-          hover: '#1a2236',      // Hover state
+          primary: '#fff7ed',
+          card: '#fffdf8',
+          hover: '#fff3e2',
         },
-        // Border colors
         border: {
-          subtle: '#1E293B',
-          hover: '#334155',
+          subtle: '#dfd0bd',
+          hover: '#b79a7a',
         },
-        // Accent colors
         accent: {
-          green: '#00E5A0',
-          red: '#FF4D6A',
-          amber: '#FFB547',
-          blue: '#4DA3FF',
+          green: '#126b4f',
+          red: '#a83232',
+          amber: '#a3651b',
+          blue: '#285a7f',
+          burgundy: '#8f1d2c',
         },
-        // Text colors
         text: {
-          primary: '#E2E8F0',
-          secondary: '#94A3B8',
-          dim: '#64748B',
+          primary: '#241f1a',
+          secondary: '#50473d',
+          dim: '#7a6d5e',
         }
       },
       fontFamily: {
-        sans: ['DM Sans', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-        display: ['Space Grotesk', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'monospace'],
+        display: ['Source Serif 4', 'Georgia', 'serif'],
       },
     },
   },

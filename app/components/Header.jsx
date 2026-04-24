@@ -1,8 +1,3 @@
-// ============================================================
-// HEADER — Top bar of the dashboard
-// Shows: Logo, Live indicator, Search bar, Alerts button
-// ============================================================
-
 "use client";
 
 import { Bell, Search, Moon, Sun, Menu, X } from "lucide-react";
@@ -19,32 +14,30 @@ export default function Header({
   onToggleSidebar,
 }) {
   return (
-    <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]">
-      {/* ── Left: Hamburger (mobile) + Logo ── */}
+    <header className="sticky top-0 z-20 flex items-center justify-between px-4 md:px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]/95 backdrop-blur">
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleSidebar}
-          className="md:hidden p-1.5 rounded-lg text-[var(--text-dim)] hover:bg-[var(--bg-primary)] cursor-pointer"
+          className="md:hidden p-1.5 rounded-md text-[var(--text-dim)] hover:bg-[var(--bg-primary)] cursor-pointer"
           aria-label="Toggle menu"
         >
           {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[var(--accent-green)] to-sky-400 flex items-center justify-center text-lg font-extrabold text-white font-display">
+        <div className="w-9 h-9 rounded-sm bg-[var(--accent-burgundy)] border border-[rgba(36,31,26,0.2)] flex items-center justify-center text-xl font-bold text-white font-display">
           F
         </div>
         <div>
-          <h1 className="text-base font-bold tracking-tight font-display text-[var(--text-primary)]">
+          <h1 className="text-[19px] leading-5 font-bold tracking-tight font-display text-[var(--text-primary)]">
             FinServTracker
           </h1>
-          <p className="text-[10px] text-[var(--text-dim)] font-mono uppercase tracking-widest">
-            by Vishal Verma
+          <p className="text-[9px] text-[var(--text-dim)] font-mono uppercase tracking-widest">
+            Indian financial intelligence
           </p>
         </div>
       </div>
 
-      {/* ── Center: Search Bar ── */}
-      <div className="hidden md:flex items-center gap-2 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 w-80">
+      <div className="hidden md:flex items-center gap-2 bg-white/55 border border-[var(--border-subtle)] rounded-md px-3 py-2 w-96">
         <Search size={14} className="text-[var(--text-dim)]" />
         <input
           type="text"
@@ -53,21 +46,20 @@ export default function Header({
           onChange={(e) => onSearchChange?.(e.target.value)}
           className="bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-dim)] outline-none w-full"
         />
-        <kbd className="text-[10px] text-[var(--text-dim)] font-mono bg-[var(--bg-card)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]">
+        <kbd className="text-[10px] text-[var(--text-dim)] font-mono bg-[var(--bg-card)] px-1.5 py-0.5 rounded-sm border border-[var(--border-subtle)]">
           /
         </kbd>
       </div>
 
-      {/* ── Right: Live + Dark Mode + Alerts ── */}
       <div className="flex items-center gap-2 md:gap-4">
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[rgba(29,111,214,0.1)] rounded-md">
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[rgba(18,107,79,0.08)] border border-[rgba(18,107,79,0.18)] rounded-sm">
           <div className="w-2 h-2 rounded-full bg-[var(--accent-green)] pulse-live" />
           <span className="text-[11px] font-semibold text-[var(--accent-green)] font-mono">LIVE</span>
         </div>
 
         <button
           onClick={onToggleDark}
-          className="p-2 rounded-lg border border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)] cursor-pointer transition-all"
+          className="p-2 rounded-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)] cursor-pointer transition-all"
           aria-label="Toggle dark mode"
         >
           {darkMode ? <Sun size={15} /> : <Moon size={15} />}
@@ -76,17 +68,19 @@ export default function Header({
         <button
           onClick={onToggleAlerts}
           className={`
-            relative flex items-center gap-2 px-3 py-2 rounded-lg border
+            relative flex items-center gap-2 px-3 py-2 rounded-md border
             text-xs font-semibold font-mono cursor-pointer transition-all
             ${showAlerts
-              ? "bg-[rgba(255,181,71,0.12)] border-[var(--accent-amber)] text-[var(--accent-amber)]"
+              ? "bg-[rgba(143,29,44,0.1)] border-[var(--accent-burgundy)] text-[var(--accent-burgundy)]"
               : "bg-transparent border-[var(--border-subtle)] text-[var(--text-dim)] hover:border-[var(--border-hover)]"
             }
           `}
         >
           <Bell size={14} />
           <span>{alertCount}</span>
-          <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--accent-red)] border-2 border-[var(--bg-card)]" />
+          {alertCount > 0 && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--accent-red)] border-2 border-[var(--bg-card)]" />
+          )}
         </button>
       </div>
     </header>

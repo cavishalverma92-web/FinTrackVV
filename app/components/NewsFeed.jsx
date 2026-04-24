@@ -7,10 +7,11 @@ import { Flame, Clock, ExternalLink, RefreshCw } from "lucide-react";
 function Tag({ label, color = "var(--accent-blue)" }) {
   return (
     <span
-      className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider font-mono"
+      className="inline-block px-2 py-0.5 rounded-sm text-[10px] font-semibold uppercase tracking-wider font-mono border border-transparent"
       style={{
         color,
         backgroundColor: `${color}18`,
+        borderColor: `${color}22`,
       }}
     >
       {label}
@@ -202,13 +203,13 @@ export default function NewsFeed({
       <div className="mb-4">
         {/* ── Title row with refresh inline ── */}
         <div className="flex items-center gap-3 mb-1">
-          <h2 className="text-lg font-bold font-display tracking-tight flex-1">
+          <h2 className="text-2xl font-bold font-display tracking-tight flex-1">
             Live Intelligence Feed
           </h2>
           <button
             onClick={onRefresh}
             disabled={dataStatus === "loading"}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-green)] text-white text-[11px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-wait flex-shrink-0"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-[var(--accent-burgundy)] text-white text-[11px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-wait flex-shrink-0"
           >
             <RefreshCw size={12} className={dataStatus === "loading" ? "animate-spin" : ""} />
             Refresh
@@ -218,9 +219,9 @@ export default function NewsFeed({
         {/* ── Subtitle ── */}
         <p className="text-xs text-[var(--text-dim)] mb-2">
           {newsItems.length} articles
-          {filteredNews.length !== newsItems.length ? ` · ${filteredNews.length} visible` : ""}
-          {updatedLabel ? ` · Updated ${updatedLabel}` : ""}
-          {cache?.servedFromCache ? " · cached" : ""}
+          {filteredNews.length !== newsItems.length ? ` / ${filteredNews.length} visible` : ""}
+          {updatedLabel ? ` / Updated ${updatedLabel}` : ""}
+          {cache?.servedFromCache ? " / cached" : ""}
         </p>
 
         {qualityStats?.filteredItems > 0 && (
@@ -242,10 +243,10 @@ export default function NewsFeed({
             key={f}
             onClick={() => setFilter(f)}
             className={`
-              px-3 py-1 rounded-full text-[11px] font-semibold
+              px-3 py-1 rounded-sm text-[11px] font-semibold
               cursor-pointer transition-all border
               ${filter === f
-                ? "bg-[var(--accent-green)] text-white border-[var(--accent-green)]"
+                ? "bg-[var(--text-primary)] text-[var(--bg-card)] border-[var(--text-primary)]"
                 : "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)] hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
               }
             `}
@@ -269,11 +270,11 @@ export default function NewsFeed({
             key={item.id}
             onClick={() => onSelectNews(item)}
             className={`
-              p-4 rounded-xl cursor-pointer transition-all border card-shadow
+              p-4 rounded-md cursor-pointer transition-all border card-shadow
               animate-fade-in stagger-${Math.min(index + 1, 8)}
               ${getCategoryClass(item.category)}
               ${selectedId === item.id
-                ? "bg-[rgba(29,111,214,0.06)] border-[rgba(29,111,214,0.25)]"
+                ? "bg-[var(--paper-highlight)] border-[var(--border-hover)]"
                 : "bg-[var(--bg-card)] border-[var(--border-subtle)] card-hover"
               }
             `}
@@ -282,12 +283,12 @@ export default function NewsFeed({
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <Tag label={item.source} color={item.sourceType === "exchange_filing" ? "#8B6FBF" : "var(--accent-blue)"} />
               {item.sourceType === "exchange_filing" && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-mono" style={{ background: "rgba(139,111,191,0.15)", color: "#8B6FBF" }}>
+                <span className="px-1.5 py-0.5 rounded-sm text-[9px] font-black uppercase tracking-wider font-mono" style={{ background: "rgba(139,111,191,0.15)", color: "#8B6FBF" }}>
                   Filing
                 </span>
               )}
               {item.sourceCount > 1 && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider font-mono bg-[var(--bg-primary)] text-[var(--text-dim)]">
+                <span className="px-1.5 py-0.5 rounded-sm text-[9px] font-black uppercase tracking-wider font-mono bg-[var(--bg-primary)] text-[var(--text-dim)]">
                   +{item.sourceCount - 1} source{item.sourceCount - 1 > 1 ? "s" : ""}
                 </span>
               )}
@@ -297,7 +298,7 @@ export default function NewsFeed({
               )}
               {item.trending && <Flame size={12} className="text-[var(--accent-amber)]" />}
               {isNew(item.publishedTs) && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[var(--accent-red)] text-white uppercase tracking-wider font-mono">
+                <span className="px-1.5 py-0.5 rounded-sm text-[9px] font-black bg-[var(--accent-red)] text-white uppercase tracking-wider font-mono">
                   NEW
                 </span>
               )}
@@ -309,7 +310,7 @@ export default function NewsFeed({
             </div>
 
             {/* Row 2 — headline */}
-            <h3 className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug mb-2">
+            <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug mb-2">
               {item.headline}
             </h3>
 

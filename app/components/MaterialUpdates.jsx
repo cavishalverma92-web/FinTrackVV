@@ -9,9 +9,9 @@ function riskColor(risk) {
 }
 
 function actionLabel(risk, type) {
-  if (risk === "High") return { label: "Act Now", color: "var(--accent-red)", bg: "rgba(217,74,93,0.12)" };
-  if (["Credit Rating", "Ratings / Credit", "Regulation", "Penalty"].includes(type)) return { label: "Monitor", color: "var(--accent-amber)", bg: "rgba(183,121,31,0.12)" };
-  return { label: "Track", color: "var(--accent-blue)", bg: "rgba(94,167,239,0.12)" };
+  if (risk === "High") return { label: "Act Now", color: "var(--accent-red)", bg: "rgba(168,50,50,0.1)" };
+  if (["Credit Rating", "Ratings / Credit", "Regulation", "Penalty"].includes(type)) return { label: "Monitor", color: "var(--accent-amber)", bg: "rgba(163,101,27,0.1)" };
+  return { label: "Track", color: "var(--accent-blue)", bg: "rgba(40,90,127,0.1)" };
 }
 
 export default function MaterialUpdates({ updates = [], onSelectNews }) {
@@ -22,10 +22,10 @@ export default function MaterialUpdates({ updates = [], onSelectNews }) {
   return (
     <section className="mb-4">
       <div className="flex items-center gap-3 mb-2">
-        <h2 className="text-sm font-bold font-display tracking-tight">
+        <h2 className="text-lg font-bold font-display tracking-tight">
           Material Updates
         </h2>
-        <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[rgba(29,111,214,0.1)] text-[var(--accent-green)] text-[9px] font-bold uppercase tracking-wider font-mono ml-auto">
+        <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[rgba(18,107,79,0.08)] border border-[rgba(18,107,79,0.16)] text-[var(--accent-green)] text-[9px] font-bold uppercase tracking-wider font-mono ml-auto">
           <Star size={9} /> Decision view
         </span>
       </div>
@@ -40,12 +40,12 @@ export default function MaterialUpdates({ updates = [], onSelectNews }) {
             <article
               key={update.id}
               onClick={() => clickable && onSelectNews(update.newsItem)}
-              className={`px-3 py-2.5 rounded-lg border card-shadow ${clickable ? "cursor-pointer card-hover" : ""}`}
+              className={`px-3 py-2.5 rounded-md border bg-[var(--bg-card)] card-shadow ${clickable ? "cursor-pointer card-hover" : ""}`}
               style={{ borderColor: `${color}25`, borderLeftColor: color, borderLeftWidth: "3px" }}
             >
               <div className="flex items-center gap-2">
                 <div
-                  className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                  className="w-6 h-6 rounded-sm flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: `${color}15`, color }}
                 >
                   {update.risk === "High" ? <ShieldAlert size={13} /> : <TrendingUp size={13} />}
@@ -59,7 +59,7 @@ export default function MaterialUpdates({ updates = [], onSelectNews }) {
                       {update.source} · {update.time || "Latest"}
                     </span>
                     <span
-                      className="ml-auto px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider font-mono"
+                      className="ml-auto px-1.5 py-0.5 rounded-sm text-[8px] font-black uppercase tracking-wider font-mono"
                       style={{ color: action.color, backgroundColor: action.bg }}
                     >
                       {action.label}

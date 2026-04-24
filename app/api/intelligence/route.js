@@ -158,18 +158,8 @@ const RSS_FEEDS = [
     defaultCategory: "Policy",
   },
   {
-    source: "Google News Financial Express",
-    url: "https://news.google.com/rss/search?q=site%3Afinancialexpress.com%20%28banking%20OR%20finance%20OR%20NBFC%20OR%20RBI%20OR%20lending%29&hl=en-IN&gl=IN&ceid=IN:en",
-    defaultCategory: "Policy",
-  },
-  {
-    source: "Google News Moneycontrol",
-    url: "https://news.google.com/rss/search?q=site%3Amoneycontrol.com%20%28banking%20OR%20finance%20OR%20NBFC%20OR%20RBI%20OR%20lending%29&hl=en-IN&gl=IN&ceid=IN:en",
-    defaultCategory: "Fundraise",
-  },
-  {
-    source: "Google News BusinessLine",
-    url: "https://news.google.com/rss/search?q=site%3Athehindubusinessline.com%20%28banking%20OR%20finance%20OR%20NBFC%20OR%20RBI%20OR%20lending%29&hl=en-IN&gl=IN&ceid=IN:en",
+    source: "BusinessLine",
+    url: "https://www.thehindubusinessline.com/money-and-banking/feeder/default.rss",
     defaultCategory: "Policy",
   },
   {
@@ -311,6 +301,30 @@ const NEWS_APIS = [
   {
     source: "GDELT",
     url: "https://api.gdeltproject.org/api/v2/doc/doc",
+  },
+];
+
+const HTML_SOURCES = [
+  {
+    source: "Financial Express Direct",
+    url: "https://www.financialexpress.com/business/banking-finance/",
+    defaultCategory: "Policy",
+    articlePattern: /^https:\/\/www\.financialexpress\.com\/business\/banking-finance/i,
+    excludePattern: /\/page\/|\/feed\/|\/amp\/?$/i,
+  },
+  {
+    source: "Moneycontrol Companies Direct",
+    url: "https://www.moneycontrol.com/news/business/companies/",
+    defaultCategory: "Fundraise",
+    articlePattern: /^https:\/\/www\.moneycontrol\.com\/news\/business\/companies\/.+\.html$/i,
+    excludePattern: /\/page-\d+\/|\/amp\/?$/i,
+  },
+  {
+    source: "Moneycontrol Banks Direct",
+    url: "https://www.moneycontrol.com/news/business/banks/",
+    defaultCategory: "Policy",
+    articlePattern: /^https:\/\/www\.moneycontrol\.com\/news\/business\/banks\/.+\.html$/i,
+    excludePattern: /\/page-\d+\/|\/amp\/?$/i,
   },
 ];
 
@@ -736,6 +750,10 @@ const SOURCE_WEIGHTS = {
   "ET Tech": 20,
   "Google News NBFC Results": 14,
   "Google News FS Fundraise": 14,
+  BusinessLine: 22,
+  "Financial Express Direct": 22,
+  "Moneycontrol Companies Direct": 20,
+  "Moneycontrol Banks Direct": 22,
 };
 
 const CATEGORY_WEIGHTS = {
@@ -784,6 +802,35 @@ function parseFeed(xml, feed) {
     source: feed.source,
     defaultCategory: feed.defaultCategory,
   })).filter((item) => item.title);
+}
+
+function parseHtmlSource(html, source) {
+  const matches = [...html.matchAll(/<a[^>]+href=["'](https?:\/\/[^"'<> ]+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+  const seen = new Set();
+  const items = [];
+
+  for (const match of matches) {
+    const link = decodeEntities(match[1] || "");
+    const title = decodeEntities(match[2] || "");
+    if (!link || !title) continue;
+    if (source.excludePattern?.test(link)) continue;
+    if (!source.articlePattern?.test(link)) continue;
+    if (title.length < 18) continue;
+    if (seen.has(link)) continue;
+    seen.add(link);
+    items.push({
+      title,
+      description: title,
+      link,
+      publishedAt: "",
+      source: source.source,
+      defaultCategory: source.defaultCategory,
+      sourceType: "html_feed",
+    });
+    if (items.length >= 18) break;
+  }
+
+  return items;
 }
 
 function hashText(value) {
@@ -1352,6 +1399,36 @@ async function fetchGdeltNews() {
     source: article.sourceCommonName || "GDELT",
     defaultCategory: "Policy",
   }, index));
+}
+
+async function fetchHtmlSourceNews() {
+  const results = await Promise.allSettled(HTML_SOURCES.map(async (source) => {
+    const response = await fetchWithTimeout(source.url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+        "Accept-Language": "en-IN,en;q=0.9",
+      },
+      next: { revalidate: 900 },
+    }, 7000);
+
+    if (!response.ok) throw new Error(`${source.source} returned ${response.status}`);
+    return parseHtmlSource(await response.text(), source);
+  }));
+
+  const health = results.map((result, index) => ({
+    ...HTML_SOURCES[index],
+    type: "HTML",
+    sourceTier: "direct",
+    status: result.status === "fulfilled" ? "ok" : "error",
+    itemCount: result.status === "fulfilled" ? result.value.length : 0,
+    error: result.status === "rejected" ? result.reason?.message || "Source failed" : null,
+  }));
+
+  const items = results
+    .flatMap((result) => result.status === "fulfilled" ? result.value : [])
+    .map(toNewsItem);
+
+  return { items, health };
 }
 
 export function dedupeAndRankNews(items) {
@@ -2064,8 +2141,9 @@ function buildSourceStats(sources = []) {
 }
 
 async function buildIntelligencePayload() {
-    const [rssNewsResult, gdeltNewsResult, marketResult, globalResult, archivedItems, bseResult, nseResult] = await Promise.allSettled([
+    const [rssNewsResult, htmlNewsResult, gdeltNewsResult, marketResult, globalResult, archivedItems, bseResult, nseResult] = await Promise.allSettled([
       fetchRssNews(),
+      fetchHtmlSourceNews(),
       fetchGdeltNews(),
       fetchMarketData(),
       fetchGlobalData(),
@@ -2084,10 +2162,21 @@ async function buildIntelligencePayload() {
           itemCount: 0,
           error: rssNewsResult.reason?.message || "RSS refresh failed",
         }));
+    const htmlItems = htmlNewsResult.status === "fulfilled" ? htmlNewsResult.value.items : [];
+    const htmlHealth = htmlNewsResult.status === "fulfilled"
+      ? htmlNewsResult.value.health
+      : HTML_SOURCES.map((source) => ({
+          ...source,
+          type: "HTML",
+          sourceTier: "direct",
+          status: "error",
+          itemCount: 0,
+          error: htmlNewsResult.reason?.message || "HTML refresh failed",
+        }));
     const gdeltItems = gdeltNewsResult.status === "fulfilled" ? gdeltNewsResult.value : [];
     const bseItems = bseResult.status === "fulfilled" ? bseResult.value : [];
     const nseItems = nseResult.status === "fulfilled" ? nseResult.value : [];
-    const freshDeduped = dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...gdeltItems]);
+    const freshDeduped = dedupeAndRankNews([...bseItems, ...nseItems, ...rssItems, ...htmlItems, ...gdeltItems]);
 
     // Merge fresh news with 24h archive from Redis
     const archive = archivedItems.status === "fulfilled" ? archivedItems.value : [];
@@ -2159,7 +2248,7 @@ async function buildIntelligencePayload() {
     const materialUpdates = buildMaterialUpdates(newsItems, market.peerData, resolvedRatings);
     const watchlist = buildWatchlist(newsItems, market.peerData, resolvedRatings);
     const dailyBrief = await buildDailyBrief(newsItems, resolvedRatings);
-    const sourceStats = buildSourceStats([...rssHealth, ...apiHealth]);
+    const sourceStats = buildSourceStats([...rssHealth, ...htmlHealth, ...apiHealth]);
 
     return {
       newsItems,
@@ -2176,9 +2265,10 @@ async function buildIntelligencePayload() {
       dailyBrief,
       sources: {
         rss: rssHealth,
+        html: htmlHealth,
         apis: apiHealth,
       },
-      sourceHealth: [...rssHealth, ...apiHealth],
+      sourceHealth: [...rssHealth, ...htmlHealth, ...apiHealth],
       sourceStats,
       updatedAt: new Date().toISOString(),
       cache: {

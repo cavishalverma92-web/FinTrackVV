@@ -40,6 +40,11 @@ function SourceRow({ source, type }) {
           <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider font-mono text-[var(--text-dim)] bg-[var(--bg-primary)]">
             {type}
           </span>
+          {source.sourceTier && (
+            <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider font-mono text-[var(--text-dim)] bg-[var(--bg-primary)]">
+              {source.sourceTier}
+            </span>
+          )}
           <span
             className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider font-mono"
             style={{ color: statusColor, backgroundColor: `${statusColor}18` }}
@@ -68,11 +73,14 @@ export default function SourceControl({
   onRefresh,
 }) {
   const rssSources = sources?.rss || [];
+  const htmlSources = sources?.html || [];
   const apiSources = sources?.apis || [];
-  const allSources = [...rssSources, ...apiSources];
+  const allSources = [...rssSources, ...htmlSources, ...apiSources];
   const okCount = allSources.filter((source) => source.status === "ok").length;
   const errorCount = allSources.filter((source) => source.status === "error").length;
   const itemCount = allSources.reduce((sum, source) => sum + Number(source.itemCount || 0), 0);
+  const directCount = allSources.filter((source) => source.sourceTier === "direct" || source.sourceTier === "primary").length;
+  const aggregatorCount = allSources.filter((source) => source.sourceTier === "aggregator").length;
   const isLoading = dataStatus === "loading";
 
   return (
@@ -129,7 +137,7 @@ export default function SourceControl({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-5">
         <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
           <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">Healthy</p>
           <p className="text-2xl font-bold text-[var(--accent-green)] font-display mt-1">{okCount}</p>
@@ -142,9 +150,17 @@ export default function SourceControl({
           <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">Raw Items</p>
           <p className="text-2xl font-bold text-[var(--text-primary)] font-display mt-1">{itemCount}</p>
         </div>
+        <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+          <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">Direct + Primary</p>
+          <p className="text-2xl font-bold text-[var(--accent-blue)] font-display mt-1">{directCount}</p>
+        </div>
+        <div className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+          <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider font-mono">Aggregators</p>
+          <p className="text-2xl font-bold text-[var(--accent-amber)] font-display mt-1">{aggregatorCount}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div>
           <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-3">
             RSS Feeds
@@ -152,6 +168,17 @@ export default function SourceControl({
           <div className="flex flex-col gap-2">
             {rssSources.map((source, index) => (
               <SourceRow key={`${source.url}-${index}`} source={source} type="RSS" />
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-3">
+            Direct Pages
+          </h3>
+          <div className="flex flex-col gap-2">
+            {htmlSources.map((source, index) => (
+              <SourceRow key={`${source.url}-${index}`} source={source} type="HTML" />
             ))}
           </div>
         </div>

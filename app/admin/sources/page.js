@@ -34,7 +34,14 @@ export default async function SourcesAdminPage() {
         )}
 
         <div className="grid gap-3">
-          {sources.map((source) => (
+          {[...sources]
+            .sort((a, b) => {
+              const tierRank = { primary: 3, direct: 2, aggregator: 1, unknown: 0 };
+              const statusRank = { error: 3, fallback: 2, ok: 1, pending: 0 };
+              if ((statusRank[b.status] || 0) !== (statusRank[a.status] || 0)) return (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+              return (tierRank[b.sourceTier] || 0) - (tierRank[a.sourceTier] || 0);
+            })
+            .map((source) => (
             <div key={`${source.source}-${source.url}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
               <div className="flex flex-wrap gap-2 mb-2 text-[11px] font-mono">
                 <span className="px-2 py-0.5 rounded bg-[var(--bg-primary)] text-[var(--text-secondary)]">{source.type}</span>

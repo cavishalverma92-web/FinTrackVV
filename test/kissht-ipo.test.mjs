@@ -49,6 +49,22 @@ test("gmp parser handles IPO portal price band copy", () => {
   assert.equal(point.estimatedListingPrice, 178);
 });
 
+test("gmp parser handles number before live gmp label", () => {
+  const point = extractGmpPoint("Price Band ₹162.00-171.00 per share ₹5 Live GMP ₹176 Est. Listing", "InvestorGain GMP", "https://example.com");
+  assert.equal(point.gmp, 5);
+  assert.equal(point.priceBand, 171);
+  assert.equal(point.gmpPercent, 2.92);
+  assert.equal(point.estimatedListingPrice, 176);
+});
+
+test("gmp parser handles premium wording from news copy", () => {
+  const point = extractGmpPoint("OnEMI Technology IPO GMP: shares trading at a Rs 4 premium over the upper price band of Rs 171", "Economic Times", "https://example.com");
+  assert.equal(point.gmp, 4);
+  assert.equal(point.priceBand, 171);
+  assert.equal(point.gmpPercent, 2.34);
+  assert.equal(point.estimatedListingPrice, 175);
+});
+
 test("kissht dedupe groups similar source variants", () => {
   const base = {
     sourceName: "Google News",

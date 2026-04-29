@@ -26,6 +26,7 @@ const EMPTY_FILTERS = {
   topic: "All",
   timeRange: "48h",
   entity: "All",
+  sortBy: "Most Recent",
 };
 
 function formatDate(value) {
@@ -145,6 +146,11 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
     if (filters.topic !== "All" && !(item.categoryTags || []).includes(filters.topic)) return false;
     if (filters.entity !== "All" && !(item.matchedEntity || "").toLowerCase().includes(filters.entity.toLowerCase())) return false;
     return withinRange(item, filters.timeRange);
+  }).sort((a, b) => {
+    if (filters.sortBy === "Most Recent") return new Date(b.publishedAt || b.updatedAt || 0) - new Date(a.publishedAt || a.updatedAt || 0);
+    if (filters.sortBy === "Oldest") return new Date(a.publishedAt || a.updatedAt || 0) - new Date(b.publishedAt || b.updatedAt || 0);
+    if (filters.sortBy === "Highest Risk") return ({ High: 3, Medium: 2, Low: 1 }[b.riskLevel] || 0) - ({ High: 3, Medium: 2, Low: 1 }[a.riskLevel] || 0);
+    return (b.materialityScore || 0) - (a.materialityScore || 0);
   }), [news, filters]);
 
   const sentimentSplit = summary.daily?.sentimentSplit || {
@@ -253,7 +259,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
                 />
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--accent-burgundy)] font-mono">IPO War Room</p>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--accent-burgundy)] font-mono">IPO War Room | By Vishal Verma</p>
                 <h1 className="font-display text-4xl font-bold tracking-tight md:text-5xl">Kissht IPO Command Center</h1>
                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
                   Real-time monitoring of news, GMP, broker notes, YouTube coverage, subscription and risk signals.
@@ -280,7 +286,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
         </header>
 
         <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <KpiCard icon={TrendingUp} label="Current GMP" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} detail={gmp.current?.gmpPercent != null ? `${gmp.current.gmpPercent}% from ${gmp.current.source}` : "Awaited / not available from public sources."} />
+          <KpiCard icon={TrendingUp} label="Current GMP" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} detail={gmp.current?.gmpPercent != null ? `${gmp.current.gmpPercent}% from ${gmp.current.source}${gmp.range && gmp.range.min !== gmp.range.max ? `; range Rs ${gmp.range.min}-${gmp.range.max}` : ""}` : "Awaited / not available from public sources."} />
           <KpiCard icon={BarChart3} label="Total Subscription" value={subscription.current?.total || "Awaited"} detail="QIB / NII / Retail appears once public IPO subscription data is available." />
           <KpiCard icon={ShieldAlert} label="Negative Alerts" value={String(risk.count24h || 0)} detail={`${risk.highRiskAlerts?.length || 0} high-risk alerts; trend: ${risk.trend || "Quiet"}.`} tone={(risk.highRiskAlerts?.length || 0) ? "negative" : "neutral"} />
           <KpiCard icon={Newspaper} label="News Coverage" value={String(news.length)} detail={`${sentimentSplit.positive} positive / ${sentimentSplit.neutral} neutral / ${sentimentSplit.negative} negative in high-confidence feed.`} />
@@ -299,6 +305,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
                 <Select label="Risk" value={filters.risk} options={["All", "High", "Medium", "Low"]} onChange={(value) => setFilters((f) => ({ ...f, risk: value }))} />
                 <Select label="Time" value={filters.timeRange} options={["1h", "6h", "24h", "48h"]} onChange={(value) => setFilters((f) => ({ ...f, timeRange: value }))} />
                 <Select label="Topic" value={filters.topic} options={["All", ...topics]} onChange={(value) => setFilters((f) => ({ ...f, topic: value }))} />
+                <Select label="Sort" value={filters.sortBy} options={["Most Recent", "Materiality", "Highest Risk", "Oldest"]} onChange={(value) => setFilters((f) => ({ ...f, sortBy: value }))} />
                 <button onClick={() => setFilters(EMPTY_FILTERS)} className="inline-flex items-center gap-1 rounded-sm border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-dim)]">
                   <Filter size={11} /> Reset
                 </button>
@@ -440,11 +447,37 @@ function GmpSection({ gmp }) {
         <div className="mb-4 grid gap-2 md:grid-cols-3">
           <MiniMetric label="Current GMP" value={`Rs ${gmp.current.gmp}`} />
           <MiniMetric label="GMP %" value={gmp.current.gmpPercent == null ? "Unavailable" : `${gmp.current.gmpPercent}%`} />
-          <MiniMetric label="Source count" value={gmp.sourceCount || 0} />
+          <MiniMetric label="Source range" value={gmp.range && gmp.range.min !== gmp.range.max ? `Rs ${gmp.range.min}-${gmp.range.max}` : gmp.sourceCount || 0} />
         </div>
       ) : <EmptyState>GMP awaited from public sources.</EmptyState>}
-      <StatusTable rows={gmp.sources || []} />
+      <GmpTable points={gmp.points || []} sources={gmp.sources || []} />
     </Section>
+  );
+}
+
+function GmpTable({ points, sources }) {
+  if (!points.length) return <StatusTable rows={sources} />;
+  return (
+    <div className="mt-4 overflow-auto">
+      <table className="w-full text-left text-xs">
+        <thead className="text-[10px] uppercase tracking-widest text-[var(--text-dim)] font-mono">
+          <tr><th className="py-2">Source</th><th>GMP</th><th>GMP %</th><th>Price band</th><th>Status</th><th>Link</th></tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--border-subtle)]">
+          {points.map((point) => (
+            <tr key={`${point.source}-${point.url}-${point.gmp}`}>
+              <td className="py-2 font-semibold">{point.source}</td>
+              <td>Rs {point.gmp}</td>
+              <td>{point.gmpPercent == null ? "Unavailable" : `${point.gmpPercent}%`}</td>
+              <td>{point.priceBand == null ? "Unavailable" : `Rs ${point.priceBand}`}</td>
+              <td><Badge tone="positive">{point.status || point.reliabilityStatus || "Live"}</Badge></td>
+              <td>{point.url ? <a href={point.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--accent-blue)] hover:underline">Open <ExternalLink size={10} /></a> : "Awaited"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <StatusTable rows={sources.filter((source) => !points.some((point) => point.source === source.source))} />
+    </div>
   );
 }
 

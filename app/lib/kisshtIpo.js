@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "kissht-ipo.json");
@@ -77,6 +77,20 @@ const IPO_DIRECT_SOURCES = [
     fallbackTitle: "OnEMI Technology Solutions (Kissht) IPO GMP",
   },
   {
+    name: "InvestorGain GMP",
+    reliability: 4,
+    type: "gmp",
+    url: "https://www.investorgain.com/gmp/onemi-technology-ipo-gmp/1591/",
+    fallbackTitle: "OnEMI Technology IPO GMP - InvestorGain",
+  },
+  {
+    name: "InvestorGain Subscription",
+    reliability: 4,
+    type: "ipo-portal",
+    url: "https://www.investorgain.com/subscription/onemi-technology-ipo/1591/",
+    fallbackTitle: "OnEMI Technology IPO Subscription - InvestorGain",
+  },
+  {
     name: "Moneycontrol IPO",
     reliability: 2,
     type: "ipo-portal",
@@ -100,11 +114,14 @@ const IPO_DIRECT_SOURCES = [
 ];
 
 const GMP_SOURCES = [
-  ["Chittorgarh", "https://www.chittorgarh.com/search?q=OnEMI%20Technology%20Solutions%20IPO%20GMP"],
+  ["Chittorgarh", "https://www.chittorgarh.com/ipo_gmp/onemi-technology-ipo/1591/"],
+  ["Chittorgarh Search", "https://www.chittorgarh.com/search?q=OnEMI%20Technology%20Solutions%20IPO%20GMP"],
   ["IPOJi", "https://www.ipoji.com/blog/onemi-technology-solutions-ipo-2026-full-details-gmp-allotment-review/"],
   ["LamfIndia", "https://lamfindia.com/ipo/details/onemi-technology-solutions-gmp"],
+  ["InvestorGain GMP", "https://www.investorgain.com/gmp/onemi-technology-ipo-gmp/1591/"],
+  ["InvestorGain Subscription", "https://www.investorgain.com/subscription/onemi-technology-ipo/1591/"],
+  ["InvestorGain Recommendations", "https://www.investorgain.com/recommendations/onemi-technology-ipo/1591/"],
   ["IPOWatch", "https://ipowatch.in/?s=OnEMI+Technology+IPO+GMP"],
-  ["InvestorGain", "https://www.investorgain.com/search?q=OnEMI%20Technology%20IPO%20GMP"],
   ["IPO Central", "https://ipocentral.in/?s=OnEMI+Technology+IPO+GMP"],
   ["5paisa IPO", "https://www.5paisa.com/ipo"],
   ["Angel One IPO", "https://www.angelone.in/ipo"],
@@ -555,10 +572,16 @@ async function fetchNewsSources() {
 
 export function extractGmpPoint(text = "", source = "Unknown", url = "") {
   const lower = text.toLowerCase();
-  if (!lower.includes("gmp")) return null;
-  const gmpMatches = [...text.matchAll(/(?:gmp|premium)[^\d-]{0,40}(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/gi)]
-    .filter((match) => !/\b(price|band|listing|date|size|open|close)\b/i.test(match[0]));
-  const gmpMatch = gmpMatches[0] || null;
+  if (!lower.includes("gmp") && !lower.includes("grey market") && !lower.includes("premium")) return null;
+  const compact = text.replace(/\s+/g, " ");
+  const gmpPatterns = [
+    /(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)\s*(?:\/-)?\s+live\s+gmp\b/i,
+    /\b(?:live|latest|today'?s?)\s+gmp\s*(?:is|:)?\s*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/i,
+    /\bgmp\b\s*(?!price\b|date\b|for\b|information\b|status\b|dashboard\b|performance\b|guide\b|data\b)(?:is|:)?\s*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/i,
+    /(?:rs\.?|inr|₹)\s*(-?\d+(?:\.\d+)?)\s+premium\b/i,
+    /\bpremium\b(?:\s+of|\s+around|\s+at|\s+is|:)?\s*(?:around\s*)?(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/i,
+  ];
+  const gmpMatch = gmpPatterns.map((pattern) => compact.match(pattern)).find(Boolean) || null;
   const bandRangeMatch = text.match(/price\s*band[^\d]{0,30}(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)/i);
   const bandSingleMatch = text.match(/(?:upper\s+price\s+band|cap\s+price|issue\s+price|price\s*\(₹\)|price)[^\d]{0,30}(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)/i);
   if (!gmpMatch) return null;
@@ -626,22 +649,47 @@ async function buildGmp(news, directSnapshot = null) {
     .map((item) => extractGmpPoint(`${item.title} ${item.snippet}`, item.sourceName, item.url))
     .filter(Boolean);
   const direct = directSnapshot || await fetchGmpSources();
-  const points = [...direct.points, ...newsPoints];
+  const points = [...direct.points, ...newsPoints]
+    .filter((point) => Number.isFinite(point.gmp))
+    .map((point) => ({
+      ...point,
+      status: point.reliabilityStatus || "Live",
+      gmpPercent: point.gmpPercent == null && point.priceBand ? Number(((point.gmp / point.priceBand) * 100).toFixed(2)) : point.gmpPercent,
+    }));
   const sources = direct.sources.map((source) => {
     if (source.status === "Working") return source;
     const found = newsPoints.find((point) => point.url?.includes(new URL(source.url).hostname) || point.source === source.source);
     return found ? { ...source, status: "Working", itemCount: 1, message: "Public GMP mention detected in news/search feed." } : source;
   });
-  const latest = points.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0] || null;
+  const uniquePoints = [];
+  for (const point of points) {
+    const existing = uniquePoints.find((candidate) => candidate.source === point.source && candidate.gmp === point.gmp);
+    if (!existing) uniquePoints.push(point);
+  }
+  const latest = uniquePoints
+    .sort((a, b) => {
+      const sourcePriority = {
+        "Chittorgarh": 5,
+        "InvestorGain GMP": 5,
+        "InvestorGain Subscription": 4,
+        "InvestorGain Recommendations": 4,
+        "LamfIndia": 3,
+        "Economic Times": 3,
+        "IPOJi": 2,
+      };
+      const priorityDelta = (sourcePriority[b.source] || 1) - (sourcePriority[a.source] || 1);
+      if (priorityDelta) return priorityDelta;
+      return new Date(b.timestamp) - new Date(a.timestamp);
+    })[0] || null;
   return {
     current: latest,
-    points,
-    sourceCount: points.length,
-    range: points.length ? {
-      min: Math.min(...points.map((point) => point.gmp)),
-      max: Math.max(...points.map((point) => point.gmp)),
+    points: uniquePoints,
+    sourceCount: uniquePoints.length,
+    range: uniquePoints.length ? {
+      min: Math.min(...uniquePoints.map((point) => point.gmp)),
+      max: Math.max(...uniquePoints.map((point) => point.gmp)),
     } : null,
-    status: points.length ? "Live" : "Awaited / Not available from public sources",
+    status: uniquePoints.length ? "Live" : "Awaited / Not available from public sources",
     sources,
   };
 }

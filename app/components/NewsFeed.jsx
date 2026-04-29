@@ -78,6 +78,16 @@ function formatUpdatedAt(value) {
   });
 }
 
+function formatTimestamp(value) {
+  if (!value) return "Unavailable";
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function itemMatchesSearch(item, query) {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return true;
@@ -342,6 +352,11 @@ export default function NewsFeed({
             </div>
 
             {/* Row 2 — headline */}
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--text-dim)] font-mono">
+              <span>Published: {formatTimestamp(item.publishedAt)}</span>
+              <span>Fetched: {formatTimestamp(item.ingestedAt)}</span>
+            </div>
+
             <h3 className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug mb-2">
               {item.headline}
             </h3>

@@ -90,7 +90,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 18;
+const CACHE_VERSION = 19;
 const ENABLE_HEAVY_SOURCE_SCRAPE = process.env.ENABLE_HEAVY_SOURCE_SCRAPE === "true";
 
 const RSS_FEEDS = [
@@ -190,6 +190,36 @@ const RSS_FEEDS = [
     defaultCategory: "Fundraise",
   },
   {
+    source: "Google News Reuters BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Areuters.com%20India%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20RBI%20OR%20SEBI%20OR%20IPO%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News CNBC TV18 BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Acnbctv18.com%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Moneycontrol BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Amoneycontrol.com%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%20OR%20SEBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News ET BFSI Search",
+    url: "https://news.google.com/rss/search?q=site%3Abfsi.economictimes.indiatimes.com%20%28NBFC%20OR%20bank%20OR%20fintech%20OR%20lending%20OR%20RBI%20OR%20SEBI%20OR%20IPO%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Business Today BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Abusinesstoday.in%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News IPO BFSI",
+    url: "https://news.google.com/rss/search?q=%28IPO%20OR%20DRHP%20OR%20RHP%20OR%20GMP%20OR%20subscription%29%20%28NBFC%20OR%20fintech%20OR%20bank%20OR%20lender%20OR%20brokerage%20OR%20OnEMI%20OR%20Kissht%29%20India%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
     source: "Google News Business Standard",
     url: "https://news.google.com/rss/search?q=site%3Abusiness-standard.com%20%28NBFC%20OR%20banking%20OR%20finance%20OR%20RBI%20OR%20lending%29&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Policy",
@@ -243,6 +273,26 @@ const RSS_FEEDS = [
     source: "Inc42",
     url: "https://inc42.com/feed/",
     defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News Inc42 Fintech",
+    url: "https://news.google.com/rss/search?q=site%3Ainc42.com%20%28fintech%20OR%20lending%20OR%20NBFC%20OR%20credit%20OR%20IPO%20OR%20funding%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News YourStory Fintech",
+    url: "https://news.google.com/rss/search?q=site%3Ayourstory.com%20%28fintech%20OR%20lending%20OR%20NBFC%20OR%20credit%20OR%20funding%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News Entrackr Fintech",
+    url: "https://news.google.com/rss/search?q=site%3Aentrackr.com%20%28fintech%20OR%20lending%20OR%20NBFC%20OR%20credit%20OR%20funding%20OR%20IPO%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
+    source: "Google News Medianama Fintech",
+    url: "https://news.google.com/rss/search?q=site%3Amedianama.com%20%28fintech%20OR%20lending%20OR%20payments%20OR%20RBI%20OR%20digital%20lending%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "AI & Tech",
   },
   {
     source: "Google News MFI",
@@ -865,6 +915,12 @@ const SOURCE_WEIGHTS = {
   "Google News Broking": 20,
   "Google News Brokerage Firms": 20,
   "Google News Financial Services": 16,
+  "Google News Reuters BFSI": 24,
+  "Google News CNBC TV18 BFSI": 22,
+  "Google News Moneycontrol BFSI": 22,
+  "Google News ET BFSI Search": 24,
+  "Google News Business Today BFSI": 20,
+  "Google News IPO BFSI": 22,
   "Google News Business Standard": 18,
   "Google News Financial Express": 16,
   "Google News Moneycontrol": 18,
@@ -881,6 +937,10 @@ const SOURCE_WEIGHTS = {
   "BQ Prime": 22,
   PIB: 30,
   Inc42: 18,
+  "Google News Inc42 Fintech": 20,
+  "Google News YourStory Fintech": 18,
+  "Google News Entrackr Fintech": 20,
+  "Google News Medianama Fintech": 18,
   "Google News MFI": 18,
   "Google News MSME Lending": 18,
   "Google News Housing Finance": 18,
@@ -1331,6 +1391,16 @@ export function isFinancialServicesMaterial(item = {}) {
     "BusinessLine",
     "Financial Express Direct",
     "Moneycontrol Banks Direct",
+    "Google News Reuters BFSI",
+    "Google News CNBC TV18 BFSI",
+    "Google News Moneycontrol BFSI",
+    "Google News ET BFSI Search",
+    "Google News Business Today BFSI",
+    "Google News IPO BFSI",
+    "Google News Inc42 Fintech",
+    "Google News YourStory Fintech",
+    "Google News Entrackr Fintech",
+    "Google News Medianama Fintech",
     "Google News Kissht",
     "Google News Broking",
     "Google News Brokerage Firms",

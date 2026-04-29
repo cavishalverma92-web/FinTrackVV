@@ -153,6 +153,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
   const subscription = snapshot.subscription || { categories: [] };
   const sourceStatus = snapshot.sourceStatus || [];
   const summary = snapshot.summary || {};
+  const ipoTimeline = snapshot.ipoTimeline || {};
 
   const filteredNews = useMemo(() => news.filter((item) => {
     if (filters.sentiment !== "All" && item.sentiment !== filters.sentiment) return false;
@@ -200,6 +201,13 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
       detail: source.message || "Source needs manual/API access.",
       url: source.url,
     })),
+  ];
+  const liveTape = snapshot.liveTape || [
+    { label: "GMP", value: gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited", detail: gmp.current?.source || gmp.status, tone: gmp.current ? "positive" : "warning", url: gmp.current?.url, timestamp: gmp.current?.timestamp },
+    { label: "Subscription", value: subscription.current?.total ? `${subscription.current.total}x` : "Awaited", detail: subscription.status, tone: subscription.current ? "positive" : "warning", url: subscription.current?.url, timestamp: subscription.current?.timestamp },
+    { label: "Latest Article", value: news[0]?.sourceName || "Awaited", detail: news[0]?.title || "No high-confidence story in selected window.", tone: news[0]?.sentiment === "Negative" ? "negative" : "neutral", url: news[0]?.url, timestamp: news[0]?.publishedAt },
+    { label: "Negative Narrative", value: risk.topFive?.[0]?.severity || "Quiet", detail: risk.topFive?.[0]?.headline || "No high-risk public narrative detected.", tone: risk.topFive?.[0]?.severity === "High" ? "negative" : risk.topFive?.[0] ? "warning" : "positive", url: risk.topFive?.[0]?.url, timestamp: risk.topFive?.[0]?.timestamp },
+    { label: "Broker Call", value: brokers.summary?.subscribe ? "Subscribe seen" : "Awaited", detail: `${brokers.summary?.subscribe || 0} subscribe / ${brokers.summary?.avoid || 0} avoid`, tone: brokers.summary?.avoid ? "negative" : brokers.summary?.subscribe ? "positive" : "warning" },
   ];
 
   const refresh = async () => {
@@ -306,6 +314,10 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
           {snapshot.error && <p className="mt-3 text-xs text-[var(--accent-amber)]">{snapshot.error}</p>}
         </header>
 
+        <LiveTape items={liveTape} updatedAt={snapshot.updatedAt} />
+
+        <WarRoomPanel gmp={gmp} subscription={subscription} ipoTimeline={ipoTimeline} />
+
         <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <KpiCard icon={TrendingUp} label="Current GMP" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} detail={gmp.current?.gmpPercent != null ? `${gmp.current.gmpPercent}% from ${gmp.current.source}${gmp.range && gmp.range.min !== gmp.range.max ? `; range Rs ${gmp.range.min}-${gmp.range.max}` : ""}` : "Awaited / not available from public sources."} />
           <KpiCard icon={BarChart3} label="Total Subscription" value={subscription.current?.total || "Awaited"} detail="QIB / NII / Retail appears once public IPO subscription data is available." />
@@ -376,6 +388,8 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
           </div>
 
           <aside className="space-y-4">
+            <NegativeNarrativePanel risk={risk} news={news} />
+
             <Section title="Risk Monitor" subtitle={`Last updated ${formatDate(risk.lastUpdatedAt)}`}>
               <div className="mb-3 grid grid-cols-3 gap-2 text-center">
                 <MiniMetric label="24h" value={risk.count24h || 0} />
@@ -423,6 +437,127 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
         </div>
       </div>
     </main>
+  );
+}
+
+function LiveTape({ items = [], updatedAt }) {
+  return (
+    <section className="mb-4 rounded-md border border-[var(--border-strong)] bg-[var(--bg-card)] card-shadow">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-2 w-2 rounded-full bg-[var(--accent-green)] pulse-live" />
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-dim)] font-mono">IPO Live Tape</p>
+        </div>
+        <span className="ml-auto text-[10px] text-[var(--text-dim)] font-mono">Checked {formatDate(updatedAt)}</span>
+      </div>
+      <div className="grid gap-px bg-[var(--border-subtle)] md:grid-cols-5">
+        {items.map((item) => (
+          <a
+            key={item.label}
+            href={item.url || "#"}
+            target={item.url ? "_blank" : undefined}
+            rel="noreferrer"
+            className="min-h-[104px] bg-[var(--bg-card)] p-3 hover:bg-[var(--bg-card-hover)]"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] font-mono">{item.label}</p>
+              <Badge tone={item.tone || "neutral"}>{item.value}</Badge>
+            </div>
+            <p className="line-clamp-2 text-xs font-semibold leading-snug text-[var(--text-primary)]">{item.detail}</p>
+            <p className="mt-2 text-[10px] text-[var(--text-dim)] font-mono">{item.timestamp ? formatDate(item.timestamp) : "Source status only"}</p>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WarRoomPanel({ gmp, subscription, ipoTimeline }) {
+  return (
+    <section className="mb-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">GMP War-Room</p>
+            <h2 className="mt-1 font-display text-xl font-bold">Source-wise grey market signal</h2>
+          </div>
+          <Badge tone={gmp.current ? "positive" : "warning"}>{gmp.current ? "Sourced" : "Awaited"}</Badge>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-4">
+          <MiniMetric label="Current GMP" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} />
+          <MiniMetric label="GMP %" value={gmp.current?.gmpPercent == null ? "Unavailable" : `${gmp.current.gmpPercent}%`} />
+          <MiniMetric label="Range" value={gmp.range && gmp.range.min !== gmp.range.max ? `Rs ${gmp.range.min}-${gmp.range.max}` : gmp.sourceCount || 0} />
+          <MiniMetric label="Price band" value={gmp.current?.priceBand ? `Rs ${gmp.current.priceBand}` : ipoTimeline.priceBandHigh ? `Rs ${ipoTimeline.priceBandLow}-${ipoTimeline.priceBandHigh}` : "Awaited"} />
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-dim)]">
+          Values remain source-wise. No silent averaging; if public sources differ, use the range and source table below.
+        </p>
+      </div>
+
+      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">Subscription Watch</p>
+            <h2 className="mt-1 font-display text-xl font-bold">Opening window demand monitor</h2>
+          </div>
+          <Badge tone={subscription.current ? "positive" : "warning"}>{subscription.status || "Awaited"}</Badge>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-5">
+          {(subscription.categories || []).map((row) => (
+            <MiniMetric key={row.category} label={row.category} value={row.current ? `${row.current}x` : "Awaited"} />
+          ))}
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-dim)]">
+          IPO open {ipoTimeline.openDate || "Apr 30"}; close {ipoTimeline.closeDate || "May 5"}; listing {ipoTimeline.listingDate || "May 8"}. Category data appears only when a public table is available.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function NegativeNarrativePanel({ risk = {}, news = [] }) {
+  const negativeNews = news
+    .filter((item) => item.sentiment === "Negative" || item.riskLevel === "High")
+    .slice(0, 3);
+  const items = risk.topFive?.length ? risk.topFive : negativeNews.map((item) => ({
+    id: item.id,
+    headline: item.title,
+    source: item.sourceName,
+    url: item.url,
+    timestamp: item.publishedAt,
+    severity: item.riskLevel,
+    reason: item.riskReason,
+    matchedKeywords: item.riskKeywords || [],
+    suggestedResponseAngle: "Prepare a source-backed clarification if the same issue repeats across reputed sources.",
+    actionRequired: item.riskLevel === "High" ? "Yes" : "Monitor",
+  }));
+
+  return (
+    <Section title="Negative Narrative Monitor" subtitle="Adverse IPO commentary, valuation concerns and risk-language watchlist.">
+      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+        <MiniMetric label="High" value={(risk.highRiskAlerts || []).length} />
+        <MiniMetric label="24h" value={risk.count24h || 0} />
+        <MiniMetric label="Mode" value={risk.trend || "Quiet"} />
+      </div>
+      <div className="space-y-2">
+        {items.length ? items.slice(0, 5).map((item) => (
+          <div key={item.id || item.headline} className="rounded-sm border border-[rgba(168,50,50,0.2)] bg-[rgba(168,50,50,0.06)] p-3">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Badge tone={riskTone(item.severity)}>{item.severity || "Watch"}</Badge>
+              <span className="text-[10px] text-[var(--text-dim)] font-mono">{item.source || "Public source"} / {formatDate(item.timestamp)}</span>
+            </div>
+            <a href={item.url} target="_blank" rel="noreferrer" className="text-sm font-bold leading-snug hover:underline">{item.headline}</a>
+            <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">{item.reason}</p>
+            {(item.matchedKeywords || []).length > 0 && (
+              <p className="mt-2 text-[10px] text-[var(--text-dim)] font-mono">Keywords: {item.matchedKeywords.slice(0, 5).join(", ")}</p>
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-dim)]">
+              IR angle: {item.suggestedResponseAngle}
+            </p>
+          </div>
+        )) : <EmptyState>No adverse public narrative detected yet.</EmptyState>}
+      </div>
+    </Section>
   );
 }
 

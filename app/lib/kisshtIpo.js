@@ -2,10 +2,20 @@ import { createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "kissht-ipo.json");
+
+const IPO_TIMELINE = {
+  openDate: "2026-04-30",
+  closeDate: "2026-05-05",
+  allotmentDate: "2026-05-06",
+  listingDate: "2026-05-08",
+  priceBandLow: 162,
+  priceBandHigh: 171,
+  lotSize: 87,
+};
 
 export const KISSHT_ENTITY_TERMS = [
   "kissht",
@@ -126,6 +136,17 @@ const GMP_SOURCES = [
   ["5paisa IPO", "https://www.5paisa.com/ipo"],
   ["Angel One IPO", "https://www.angelone.in/ipo"],
   ["Groww IPO", "https://groww.in/ipo"],
+];
+
+const SUBSCRIPTION_SOURCES = [
+  ["NSE IPO", "https://www.nseindia.com/market-data/issue-information", 1],
+  ["BSE IPO", "https://www.bseindia.com/static/markets/PublicIssues/IPONew.aspx", 1],
+  ["Chittorgarh Subscription", "https://www.chittorgarh.com/ipo_subscription/onemi-technology-ipo/1591/", 4],
+  ["Chittorgarh IPO", "https://www.chittorgarh.com/ipo/onemi-technology-ipo/1591/", 4],
+  ["InvestorGain Subscription", "https://www.investorgain.com/subscription/onemi-technology-ipo/1591/", 4],
+  ["IPO Watch Subscription", "https://ipowatch.in/?s=OnEMI+Technology+IPO+subscription", 4],
+  ["IPO Central Subscription", "https://ipocentral.in/?s=OnEMI+Technology+IPO+subscription", 4],
+  ["Moneycontrol IPO", "https://www.moneycontrol.com/ipo/onemi-technology-solutions-ltd-ots-ipodetail", 2],
 ];
 
 const BROKERS = [
@@ -644,6 +665,22 @@ async function fetchGmpSources() {
   };
 }
 
+function emptyGmpSourceSnapshot() {
+  return {
+    points: [],
+    sources: GMP_SOURCES.map(([source, url]) => ({
+      source,
+      url,
+      sourceType: "gmp",
+      reliabilityLevel: 4,
+      lastFetchedAt: nowIso(),
+      status: "Awaited",
+      itemCount: 0,
+      message: "GMP source not refreshed in fallback mode.",
+    })),
+  };
+}
+
 async function buildGmp(news, directSnapshot = null) {
   const newsPoints = news
     .map((item) => extractGmpPoint(`${item.title} ${item.snippet}`, item.sourceName, item.url))
@@ -781,27 +818,133 @@ function buildRisk(news) {
   };
 }
 
-function buildSubscription(news) {
-  const sourceRows = ["NSE IPO", "BSE IPO", "Chittorgarh", "IPOWatch", "InvestorGain", "Moneycontrol IPO", "IPO Central"].map((source) => ({
+function parseSubscriptionValue(text = "", labels = []) {
+  const clean = String(text).replace(/\s+/g, " ");
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const patterns = [
+      new RegExp(`${escaped}.{0,80}?(\\d+(?:\\.\\d+)?)\\s*(?:x|times|time)`, "i"),
+      new RegExp(`${escaped}.{0,80}?subscribed.{0,20}?(\\d+(?:\\.\\d+)?)`, "i"),
+      new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x|times|time).{0,80}?${escaped}`, "i"),
+    ];
+    const match = patterns.map((pattern) => clean.match(pattern)).find(Boolean);
+    if (match) return Number(match[1]).toFixed(2);
+  }
+  return null;
+}
+
+function extractSubscriptionPoint(text = "", source = "Unknown", url = "") {
+  const lower = text.toLowerCase();
+  if (!/subscription|subscribed|qib|nii|retail|hni|employee/i.test(text)) return null;
+  if (!/kissht|onemi|si\s*creva|sicreva/i.test(`${text} ${url}`)) return null;
+
+  const qib = parseSubscriptionValue(text, ["QIB", "Qualified Institutional Buyers", "Qualified Institutional"]);
+  const nii = parseSubscriptionValue(text, ["NII", "HNI", "Non Institutional Investors", "Non-Institutional Investors"]);
+  const retail = parseSubscriptionValue(text, ["Retail", "RII", "Retail Individual Investors"]);
+  const employee = parseSubscriptionValue(text, ["Employee", "Employees"]);
+  const total = parseSubscriptionValue(text, ["Total", "Overall"]);
+  const hasAnyValue = [qib, nii, retail, employee, total].some(Boolean);
+  if (!hasAnyValue) return null;
+
+  return {
     source,
-    url: source === "NSE IPO" ? "https://www.nseindia.com/market-data/issue-information" : source === "BSE IPO" ? "https://www.bseindia.com/static/markets/PublicIssues/IPONew.aspx" : `https://www.google.com/search?q=${encodeURIComponent(`${source} Kissht IPO subscription`)}`,
+    url,
     timestamp: nowIso(),
-    status: "Awaited",
-    message: "Starts when IPO opens / public subscription table appears.",
+    dayNumber: null,
+    qib,
+    nii,
+    retail,
+    employee,
+    total,
+    status: "Live",
+  };
+}
+
+async function fetchSubscriptionSources() {
+  const results = await Promise.allSettled(SUBSCRIPTION_SOURCES.map(async ([source, url, reliabilityLevel]) => {
+    const response = await fetchWithTimeout(url, {}, 6500);
+    if (!response.ok) throw new Error(`${source} returned ${response.status}`);
+    const html = await readTextWithTimeout(response, 3500, `${source} subscription page read`);
+    const text = htmlToText(html);
+    const point = extractSubscriptionPoint(text, source, canonicalFromHtml(html, url));
+    return {
+      point,
+      status: {
+        source,
+        url,
+        sourceType: "subscription",
+        reliabilityLevel,
+        lastFetchedAt: nowIso(),
+        status: point ? "Working" : "Awaited",
+        itemCount: point ? 1 : 0,
+        message: point ? "Category-wise subscription parsed from public page." : "Public subscription table not live or not parseable yet.",
+      },
+    };
   }));
   return {
-    current: null,
-    categories: ["QIB", "NII / HNI", "Retail", "Employee", "Total"].map((category) => ({
+    points: results.flatMap((result) => result.status === "fulfilled" && result.value.point ? [result.value.point] : []),
+    sources: results.map((result, index) => {
+      if (result.status === "fulfilled") return result.value.status;
+      const [source, url, reliabilityLevel] = SUBSCRIPTION_SOURCES[index];
+      return {
+        source,
+        url,
+        sourceType: "subscription",
+        reliabilityLevel,
+        lastFetchedAt: nowIso(),
+        status: "Failed",
+        itemCount: 0,
+        message: "Public subscription page unavailable for this refresh.",
+      };
+    }),
+  };
+}
+
+function latestSubscriptionPoint(points = []) {
+  return [...points].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))[0] || null;
+}
+
+function buildSubscription(news, directSnapshot = null) {
+  const newsPoints = news
+    .map((item) => extractSubscriptionPoint(`${item.title} ${item.snippet}`, item.sourceName, item.url))
+    .filter(Boolean);
+  const direct = directSnapshot || { points: [], sources: SUBSCRIPTION_SOURCES.map(([source, url, reliabilityLevel]) => ({
+    source,
+    url,
+    sourceType: "subscription",
+    reliabilityLevel,
+    lastFetchedAt: nowIso(),
+    status: "Awaited",
+    itemCount: 0,
+    message: "Starts when IPO opens / public subscription table appears.",
+  })) };
+  const points = [...direct.points, ...newsPoints];
+  const current = latestSubscriptionPoint(points);
+  const categoryMap = [
+    ["QIB", "qib"],
+    ["NII / HNI", "nii"],
+    ["Retail", "retail"],
+    ["Employee", "employee"],
+    ["Total", "total"],
+  ];
+  const sourceRows = direct.sources.map((source) => {
+    if (source.status === "Working") return source;
+    const found = newsPoints.find((point) => point.source === source.source || point.url?.includes("subscription"));
+    return found ? { ...source, status: "Working", itemCount: 1, message: "Public subscription mention detected in news/search feed." } : source;
+  });
+  return {
+    current,
+    categories: categoryMap.map(([category, key]) => ({
       category,
-      current: null,
+      current: current?.[key] || null,
       change: null,
-      source: "Awaited",
-      timestamp: null,
-      status: "Awaited",
+      source: current?.[key] ? current.source : "Awaited",
+      timestamp: current?.[key] ? current.timestamp : null,
+      status: current?.[key] ? "Live" : "Awaited",
     })),
-    history: [],
+    history: points,
     sources: sourceRows,
-    status: "Starts when IPO opens / Awaited",
+    status: current ? "Live" : "Starts when IPO opens / Awaited",
   };
 }
 
@@ -838,6 +981,61 @@ function buildYoutube() {
       message: "No YouTube videos are fabricated. Add/enable YouTube Data API to fetch views and timestamps.",
     }],
   };
+}
+
+function buildLiveTape(news, risk, gmp, brokers, subscription) {
+  const latestNews = [...news]
+    .sort((a, b) => new Date(b.publishedAt || b.updatedAt || 0) - new Date(a.publishedAt || a.updatedAt || 0))[0] || null;
+  const latestRisk = risk.topFive?.[0] || null;
+  const latestBroker = (brokers.notes || []).find((note) => note.sourceUrl && note.recommendation !== "Awaited") || null;
+  return [
+    {
+      label: "GMP",
+      value: gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited",
+      detail: gmp.current?.gmpPercent == null ? gmp.status : `${gmp.current.gmpPercent}% from ${gmp.current.source}`,
+      tone: gmp.current ? "positive" : "warning",
+      url: gmp.current?.url || null,
+      timestamp: gmp.current?.timestamp || null,
+    },
+    {
+      label: "Subscription",
+      value: subscription.current?.total ? `${subscription.current.total}x` : "Awaited",
+      detail: subscription.current ? `Source: ${subscription.current.source}` : subscription.status,
+      tone: subscription.current ? "positive" : "warning",
+      url: subscription.current?.url || null,
+      timestamp: subscription.current?.timestamp || null,
+    },
+    {
+      label: "Latest Article",
+      value: latestNews ? latestNews.sourceName : "Awaited",
+      detail: latestNews?.title || "No high-confidence story in selected window.",
+      tone: latestNews ? sentimentToneForPayload(latestNews.sentiment) : "neutral",
+      url: latestNews?.url || null,
+      timestamp: latestNews?.publishedAt || null,
+    },
+    {
+      label: "Negative Narrative",
+      value: latestRisk ? latestRisk.severity : "Quiet",
+      detail: latestRisk?.headline || "No high-risk public narrative detected.",
+      tone: latestRisk?.severity === "High" ? "negative" : latestRisk ? "warning" : "positive",
+      url: latestRisk?.url || null,
+      timestamp: latestRisk?.timestamp || null,
+    },
+    {
+      label: "Broker Call",
+      value: latestBroker?.recommendation || "Awaited",
+      detail: latestBroker ? `${latestBroker.broker}: ${latestBroker.reportTitle}` : "No explicit public broker recommendation found yet.",
+      tone: latestBroker?.recommendation === "Avoid" ? "negative" : latestBroker ? "positive" : "warning",
+      url: latestBroker?.sourceUrl || null,
+      timestamp: latestBroker?.date || null,
+    },
+  ];
+}
+
+function sentimentToneForPayload(sentiment) {
+  if (sentiment === "Negative") return "negative";
+  if (sentiment === "Positive") return "positive";
+  return "neutral";
 }
 
 function buildSummary(news, risk, gmp, brokers, youtube, social, subscription) {
@@ -909,17 +1107,19 @@ async function writeCache(payload) {
 }
 
 async function buildKisshtIpoPayload() {
-  const [{ news, statuses: newsStatuses }, social, directGmp] = await Promise.all([
+  const [{ news, statuses: newsStatuses }, social, directGmp, directSubscription] = await Promise.all([
     withTimeout(fetchNewsSources(), 10000, "Kissht news refresh"),
     fetchXSocial(),
     withTimeout(fetchGmpSources(), 9000, "Kissht GMP refresh"),
+    withTimeout(fetchSubscriptionSources(), 9000, "Kissht subscription refresh"),
   ]);
   const risk = buildRisk(news);
   const gmp = await buildGmp(news, directGmp);
   const brokers = buildBrokerNotes(news);
   const youtube = buildYoutube();
-  const subscription = buildSubscription(news);
+  const subscription = buildSubscription(news, directSubscription);
   const summary = buildSummary(news, risk, gmp, brokers, youtube, social, subscription);
+  const liveTape = buildLiveTape(news, risk, gmp, brokers, subscription);
   const sourceStatus = [
     ...newsStatuses,
     ...gmp.sources,
@@ -948,6 +1148,8 @@ async function buildKisshtIpoPayload() {
     social,
     subscription,
     summary,
+    liveTape,
+    ipoTimeline: IPO_TIMELINE,
     sourceStatus,
     sourceReliability: [
       { level: 1, label: "Official / regulatory" },
@@ -976,18 +1178,26 @@ export async function getKisshtIpoSnapshot({ forceRefresh = false, allowStale = 
         cache: { ...(cached.cache || {}), servedFromCache: true, refreshFailed: true, refreshError: error.message },
       };
     }
+    const emptyRisk = buildRisk([]);
+    const emptyGmp = await buildGmp([], emptyGmpSourceSnapshot());
+    const emptyBrokers = buildBrokerNotes([]);
+    const emptyYoutube = buildYoutube();
+    const emptySocial = { items: [], statuses: [] };
+    const emptySubscription = buildSubscription([]);
     const empty = {
       updatedAt: nowIso(),
       entities: KISSHT_ENTITY_TERMS,
       news: [],
       possibleMatches: [],
-      risk: buildRisk([]),
-      gmp: await buildGmp([]),
-      brokers: buildBrokerNotes([]),
-      youtube: buildYoutube(),
-      social: { items: [], statuses: [] },
-      subscription: buildSubscription([]),
-      summary: buildSummary([], buildRisk([]), await buildGmp([]), buildBrokerNotes([]), buildYoutube(), { items: [] }, buildSubscription([])),
+      risk: emptyRisk,
+      gmp: emptyGmp,
+      brokers: emptyBrokers,
+      youtube: emptyYoutube,
+      social: emptySocial,
+      subscription: emptySubscription,
+      summary: buildSummary([], emptyRisk, emptyGmp, emptyBrokers, emptyYoutube, emptySocial, emptySubscription),
+      liveTape: buildLiveTape([], emptyRisk, emptyGmp, emptyBrokers, emptySubscription),
+      ipoTimeline: IPO_TIMELINE,
       sourceStatus: [],
       error: "Kissht IPO sources unavailable; no fabricated data shown.",
       cache: { cached: false, fallback: true, refreshError: error.message },

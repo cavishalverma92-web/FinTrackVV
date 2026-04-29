@@ -26,3 +26,5 @@ yarn-error.log*
 
 # Runtime cache (generated, not source)
 data/cache/
+
+.vercel

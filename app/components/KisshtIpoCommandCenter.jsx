@@ -5,20 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
-  BarChart3,
   Bell,
   Clock,
   ExternalLink,
-  FileText,
   Filter,
   Moon,
-  Newspaper,
   Radio,
   RefreshCw,
-  ShieldAlert,
   Signal,
   Sun,
-  TrendingUp,
   Video,
 } from "lucide-react";
 
@@ -63,23 +58,6 @@ function Badge({ children, tone = "neutral" }) {
     <span className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider font-mono ${tones[tone] || tones.neutral}`}>
       {children}
     </span>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, detail, tone = "neutral" }) {
-  return (
-    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] font-mono">{label}</p>
-          <p className="mt-2 text-2xl font-bold font-display text-[var(--text-primary)]">{value}</p>
-        </div>
-        <div className={`rounded-sm border p-2 ${tone === "negative" ? "text-[var(--accent-red)] border-[rgba(168,50,50,0.2)] bg-[rgba(168,50,50,0.08)]" : "text-[var(--accent-blue)] border-[rgba(40,90,127,0.2)] bg-[rgba(40,90,127,0.08)]"}`}>
-          <Icon size={17} />
-        </div>
-      </div>
-      <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-dim)]">{detail}</p>
-    </div>
   );
 }
 
@@ -206,8 +184,8 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
     { label: "GMP", value: gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited", detail: gmp.current?.source || gmp.status, tone: gmp.current ? "positive" : "warning", url: gmp.current?.url, timestamp: gmp.current?.timestamp },
     { label: "Subscription", value: subscription.current?.total ? `${subscription.current.total}x` : "Awaited", detail: subscription.status, tone: subscription.current ? "positive" : "warning", url: subscription.current?.url, timestamp: subscription.current?.timestamp },
     { label: "Latest Article", value: news[0]?.sourceName || "Awaited", detail: news[0]?.title || "No high-confidence story in selected window.", tone: news[0]?.sentiment === "Negative" ? "negative" : "neutral", url: news[0]?.url, timestamp: news[0]?.publishedAt },
-    { label: "Negative Narrative", value: risk.topFive?.[0]?.severity || "Quiet", detail: risk.topFive?.[0]?.headline || "No high-risk public narrative detected.", tone: risk.topFive?.[0]?.severity === "High" ? "negative" : risk.topFive?.[0] ? "warning" : "positive", url: risk.topFive?.[0]?.url, timestamp: risk.topFive?.[0]?.timestamp },
-    { label: "Broker Call", value: brokers.summary?.subscribe ? "Subscribe seen" : "Awaited", detail: `${brokers.summary?.subscribe || 0} subscribe / ${brokers.summary?.avoid || 0} avoid`, tone: brokers.summary?.avoid ? "negative" : brokers.summary?.subscribe ? "positive" : "warning" },
+    { label: "Adverse Narrative", value: risk.topFive?.[0]?.severity || "Quiet", detail: risk.topFive?.[0]?.headline || "No high-risk public narrative detected.", tone: risk.topFive?.[0]?.severity === "High" ? "negative" : risk.topFive?.[0] ? "warning" : "positive", url: risk.topFive?.[0]?.url, timestamp: risk.topFive?.[0]?.timestamp },
+    { label: "Broker Stance", value: brokers.summary?.subscribe ? "Subscribe seen" : "Awaited", detail: `${brokers.summary?.subscribe || 0} subscribe / ${brokers.summary?.avoid || 0} avoid`, tone: brokers.summary?.avoid ? "negative" : brokers.summary?.subscribe ? "positive" : "warning" },
   ];
 
   const refresh = async () => {
@@ -316,15 +294,16 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
 
         <LiveTape items={liveTape} updatedAt={snapshot.updatedAt} />
 
-        <WarRoomPanel gmp={gmp} subscription={subscription} ipoTimeline={ipoTimeline} />
+        <CommandSummary
+          gmp={gmp}
+          subscription={subscription}
+          risk={risk}
+          news={news}
+          brokers={brokers}
+          ipoTimeline={ipoTimeline}
+        />
 
-        <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <KpiCard icon={TrendingUp} label="Current GMP" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} detail={gmp.current?.gmpPercent != null ? `${gmp.current.gmpPercent}% from ${gmp.current.source}${gmp.range && gmp.range.min !== gmp.range.max ? `; range Rs ${gmp.range.min}-${gmp.range.max}` : ""}` : "Awaited / not available from public sources."} />
-          <KpiCard icon={BarChart3} label="Total Subscription" value={subscription.current?.total || "Awaited"} detail="QIB / NII / Retail appears once public IPO subscription data is available." />
-          <KpiCard icon={ShieldAlert} label="Negative Alerts" value={String(risk.count24h || 0)} detail={`${risk.highRiskAlerts?.length || 0} high-risk alerts; trend: ${risk.trend || "Quiet"}.`} tone={(risk.highRiskAlerts?.length || 0) ? "negative" : "neutral"} />
-          <KpiCard icon={Newspaper} label="News Coverage" value={String(news.length)} detail={`${sentimentSplit.positive} positive / ${sentimentSplit.neutral} neutral / ${sentimentSplit.negative} negative in high-confidence feed.`} />
-          <KpiCard icon={FileText} label="Broker View" value={`${brokers.summary?.subscribe || 0}/${brokers.summary?.avoid || 0}`} detail={`${brokers.summary?.subscribe || 0} subscribe, ${brokers.summary?.neutral || 0} neutral, ${brokers.summary?.avoid || 0} avoid, ${brokers.summary?.awaited || 0} awaited.`} />
-        </div>
+        <WarRoomPanel gmp={gmp} subscription={subscription} ipoTimeline={ipoTimeline} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
@@ -472,14 +451,83 @@ function LiveTape({ items = [], updatedAt }) {
   );
 }
 
+function ipoWindowLabel(ipoTimeline = {}) {
+  const open = ipoTimeline.openDate ? new Date(`${ipoTimeline.openDate}T00:00:00+05:30`) : null;
+  const close = ipoTimeline.closeDate ? new Date(`${ipoTimeline.closeDate}T23:59:59+05:30`) : null;
+  const now = new Date();
+  if (open && now < open) {
+    const days = Math.ceil((open - now) / 86400000);
+    return days <= 1 ? "Opens tomorrow" : `Opens in ${days} days`;
+  }
+  if (open && close && now >= open && now <= close) return "Issue open";
+  if (close && now > close) return "Issue closed";
+  return "IPO window";
+}
+
+function CommandSummary({ gmp, subscription, risk, news, brokers, ipoTimeline }) {
+  const publicCoverage = `${news.length} high-confidence stories`;
+  const gmpLine = gmp.current
+    ? `GMP Rs ${gmp.current.gmp}${gmp.current.gmpPercent == null ? "" : ` (${gmp.current.gmpPercent}%)`} from ${gmp.current.source}`
+    : "GMP awaited from public sources";
+  const demandLine = subscription.current?.total
+    ? `Total subscription ${subscription.current.total}x from ${subscription.current.source}`
+    : "Demand data awaited until public subscription table appears";
+  const riskLine = (risk.highRiskAlerts || []).length
+    ? `${risk.highRiskAlerts.length} high-risk item(s); prepare IR context`
+    : risk.count24h
+      ? `${risk.count24h} risk-linked item(s); monitor`
+      : "No high-risk public narrative detected";
+  const action = (risk.highRiskAlerts || []).length
+    ? "Prepare response"
+    : risk.count24h || brokers.summary?.avoid
+      ? "Monitor"
+      : "No action";
+
+  return (
+    <section className="mb-4 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
+      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Badge tone="blue">{ipoWindowLabel(ipoTimeline)}</Badge>
+            <Badge tone={action === "Prepare response" ? "negative" : action === "Monitor" ? "warning" : "positive"}>{action}</Badge>
+            <span className="text-[10px] text-[var(--text-dim)] font-mono">
+              Price band {ipoTimeline.priceBandLow && ipoTimeline.priceBandHigh ? `Rs ${ipoTimeline.priceBandLow}-${ipoTimeline.priceBandHigh}` : "awaited"} / Lot {ipoTimeline.lotSize || "awaited"}
+            </span>
+          </div>
+          <h2 className="font-display text-2xl font-bold tracking-tight">Executive Command Summary</h2>
+          <p className="mt-2 max-w-4xl text-sm leading-relaxed text-[var(--text-secondary)]">
+            {gmpLine}. {demandLine}. {riskLine}. Public coverage: {publicCoverage}.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <SignalTile label="Grey market" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} detail={gmp.current?.gmpPercent == null ? "No sourced %" : `${gmp.current.gmpPercent}% of upper band`} />
+          <SignalTile label="Demand" value={subscription.current?.total ? `${subscription.current.total}x` : "Awaited"} detail="QIB / NII / Retail source-backed only" />
+          <SignalTile label="Narrative" value={risk.trend || "Quiet"} detail={`${risk.count24h || 0} risk-linked in 24h`} />
+          <SignalTile label="Broker stance" value={`${brokers.summary?.subscribe || 0}/${brokers.summary?.avoid || 0}`} detail="Subscribe / avoid public calls" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SignalTile({ label, value, detail }) {
+  return (
+    <div className="rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] font-mono">{label}</p>
+      <p className="mt-1 font-display text-xl font-bold text-[var(--text-primary)]">{value}</p>
+      <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-dim)]">{detail}</p>
+    </div>
+  );
+}
+
 function WarRoomPanel({ gmp, subscription, ipoTimeline }) {
   return (
     <section className="mb-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">GMP War-Room</p>
-            <h2 className="mt-1 font-display text-xl font-bold">Source-wise grey market signal</h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">Grey Market Signal</p>
+            <h2 className="mt-1 font-display text-xl font-bold">Source-wise premium monitor</h2>
           </div>
           <Badge tone={gmp.current ? "positive" : "warning"}>{gmp.current ? "Sourced" : "Awaited"}</Badge>
         </div>
@@ -533,7 +581,7 @@ function NegativeNarrativePanel({ risk = {}, news = [] }) {
   }));
 
   return (
-    <Section title="Negative Narrative Monitor" subtitle="Adverse IPO commentary, valuation concerns and risk-language watchlist.">
+    <Section title="Adverse Narrative Monitor" subtitle="Negative IPO commentary, valuation concerns and risk-language watchlist.">
       <div className="mb-3 grid grid-cols-3 gap-2 text-center">
         <MiniMetric label="High" value={(risk.highRiskAlerts || []).length} />
         <MiniMetric label="24h" value={risk.count24h || 0} />

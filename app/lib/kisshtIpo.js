@@ -621,6 +621,12 @@ export function extractGmpPoint(text = "", source = "Unknown", url = "") {
   };
 }
 
+function resolvePriceBand(point) {
+  const parsed = Number(point.priceBand);
+  if (Number.isFinite(parsed) && parsed >= IPO_TIMELINE.priceBandLow) return parsed;
+  return IPO_TIMELINE.priceBandHigh || null;
+}
+
 async function fetchGmpSources() {
   const results = await Promise.allSettled(GMP_SOURCES.map(async ([source, url]) => {
     const response = await fetchWithTimeout(url, {}, 6500);
@@ -691,7 +697,9 @@ async function buildGmp(news, directSnapshot = null) {
     .map((point) => ({
       ...point,
       status: point.reliabilityStatus || "Live",
-      gmpPercent: point.gmpPercent == null && point.priceBand ? Number(((point.gmp / point.priceBand) * 100).toFixed(2)) : point.gmpPercent,
+      priceBand: resolvePriceBand(point),
+      gmpPercent: resolvePriceBand(point) ? Number(((point.gmp / resolvePriceBand(point)) * 100).toFixed(2)) : null,
+      estimatedListingPrice: resolvePriceBand(point) ? Number((resolvePriceBand(point) + point.gmp).toFixed(2)) : null,
     }));
   const sources = direct.sources.map((source) => {
     if (source.status === "Working") return source;
@@ -1014,7 +1022,7 @@ function buildLiveTape(news, risk, gmp, brokers, subscription) {
       timestamp: latestNews?.publishedAt || null,
     },
     {
-      label: "Negative Narrative",
+      label: "Adverse Narrative",
       value: latestRisk ? latestRisk.severity : "Quiet",
       detail: latestRisk?.headline || "No high-risk public narrative detected.",
       tone: latestRisk?.severity === "High" ? "negative" : latestRisk ? "warning" : "positive",
@@ -1022,7 +1030,7 @@ function buildLiveTape(news, risk, gmp, brokers, subscription) {
       timestamp: latestRisk?.timestamp || null,
     },
     {
-      label: "Broker Call",
+      label: "Broker Stance",
       value: latestBroker?.recommendation || "Awaited",
       detail: latestBroker ? `${latestBroker.broker}: ${latestBroker.reportTitle}` : "No explicit public broker recommendation found yet.",
       tone: latestBroker?.recommendation === "Avoid" ? "negative" : latestBroker ? "positive" : "warning",

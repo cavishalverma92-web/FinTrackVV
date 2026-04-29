@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import {
   Newspaper, FileText, TrendingUp, BarChart3,
   Handshake, Landmark, Globe, RefreshCw,
+  ShieldAlert,
 } from "lucide-react";
 import { NAV_TABS } from "../../data/appConfig";
 
@@ -67,6 +69,20 @@ export default function Sidebar({ activeTab, onTabChange, open = false, onClose,
             );
           })}
         </nav>
+
+        <div className="px-2 pt-4">
+          <p className="px-3 mb-2 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-widest font-mono">
+            Command Center
+          </p>
+          <Link
+            href="/kissht-ipo"
+            onClick={onClose}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--paper-highlight)] text-sm font-medium text-[var(--accent-burgundy)] hover:bg-[var(--bg-card)]"
+          >
+            <ShieldAlert size={16} />
+            <span>Kissht IPO</span>
+          </Link>
+        </div>
 
         <div className="mt-auto px-4 pt-4 border-t border-[var(--border-subtle)]">
           <p className="text-[10px] text-[var(--text-dim)] font-mono leading-relaxed">

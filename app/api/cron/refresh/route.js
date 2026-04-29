@@ -1,4 +1,5 @@
 import { getIntelligenceSnapshot } from "../../intelligence/route";
+import { getKisshtIpoSnapshot } from "../../../lib/kisshtIpo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,10 @@ export async function GET(request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const payload = await getIntelligenceSnapshot({ forceRefresh: true });
+  const [payload, kisshtIpo] = await Promise.all([
+    getIntelligenceSnapshot({ forceRefresh: true }),
+    getKisshtIpoSnapshot({ forceRefresh: true }),
+  ]);
 
   return Response.json({
     ok: true,
@@ -23,6 +27,11 @@ export async function GET(request) {
     newsItems: payload.newsItems?.length || 0,
     materialUpdates: payload.materialUpdates?.length || 0,
     sourceHealth: payload.sourceHealth?.length || 0,
+    kisshtIpo: {
+      refreshedAt: kisshtIpo.updatedAt,
+      newsItems: kisshtIpo.news?.length || 0,
+      sourceHealth: kisshtIpo.sourceStatus?.length || 0,
+    },
     qualityStats: payload.qualityStats || null,
     cache: payload.cache || null,
   });

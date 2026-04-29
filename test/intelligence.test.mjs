@@ -142,13 +142,7 @@ test("broking taxonomy captures new-age and traditional brokers", () => {
 });
 
 test("kissht section captures corporate aliases and material news", () => {
-  assert.deepEqual(
-    FILTER_OPTIONS.slice(
-      FILTER_OPTIONS.indexOf("Digital Lenders"),
-      FILTER_OPTIONS.indexOf("Digital Lenders") + 2
-    ),
-    ["Digital Lenders", "Kissht"]
-  );
+  assert.ok(!FILTER_OPTIONS.includes("Kissht"));
   assert.equal(classifySector("Onemi Technologies-owned Kissht updates lending platform", "Policy"), "Kissht");
   assert.equal(classifySector("Si Creva Capital Services rating action for digital lending business", "Credit Rating"), "Kissht");
   assert.equal(classifySegment("Si-Creva and Onemi Technologies raise debt for Kissht", "Fundraise"), "Kissht");

@@ -3,7 +3,6 @@ export const FILTER_OPTIONS = [
   "Exchange Filings",
   "NBFCs",
   "Digital Lenders",
-  "Kissht",
   "Banks",
   "AI & Tech",
   "HFCs",

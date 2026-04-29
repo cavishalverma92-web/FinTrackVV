@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   BarChart3,
+  Bell,
   Clock,
   ExternalLink,
   FileText,
@@ -126,6 +127,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const news = snapshot.news || [];
   const risk = snapshot.risk || {};
@@ -152,6 +154,33 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
   };
   const topics = [...new Set(news.flatMap((item) => item.categoryTags || []))];
   const workingSources = sourceStatus.filter((source) => source.status === "Working").length;
+  const sourceProblems = sourceStatus.filter((source) => ["Failed", "Manual/API required"].includes(source.status));
+  const notifications = [
+    ...(risk.highRiskAlerts || []).slice(0, 3).map((item) => ({
+      tone: "negative",
+      title: item.headline,
+      detail: item.reason,
+      url: item.url,
+    })),
+    ...(risk.topFive || []).filter((item) => item.severity !== "High").slice(0, 2).map((item) => ({
+      tone: "warning",
+      title: item.headline,
+      detail: item.reason,
+      url: item.url,
+    })),
+    ...(gmp.current ? [{
+      tone: "positive",
+      title: `Latest sourced GMP: Rs ${gmp.current.gmp}`,
+      detail: gmp.current.gmpPercent == null ? gmp.current.source : `${gmp.current.gmpPercent}% from ${gmp.current.source}`,
+      url: gmp.current.url,
+    }] : []),
+    ...sourceProblems.slice(0, 2).map((source) => ({
+      tone: source.status === "Failed" ? "negative" : "warning",
+      title: `${source.source}: ${source.status}`,
+      detail: source.message || "Source needs manual/API access.",
+      url: source.url,
+    })),
+  ];
 
   const refresh = async () => {
     setRefreshing(true);
@@ -172,23 +201,64 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
     <main className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent-blue)] hover:underline">
-            <ArrowLeft size={15} /> FinServTracker
+          <Link href="/" className="inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-4 py-2.5 text-sm font-bold text-[var(--accent-blue)] card-shadow hover:bg-[var(--paper-highlight)]">
+            <ArrowLeft size={17} /> Return to FinServTracker
           </Link>
-          <div className="flex items-center gap-2 text-[11px] text-[var(--text-dim)] font-mono">
-            <span className="inline-flex h-2 w-2 rounded-full bg-[var(--accent-green)] pulse-live" />
-            Auto-refresh via cache TTL
+          <div className="relative flex items-center gap-3">
+            <div className="flex items-center gap-2 text-[11px] text-[var(--text-dim)] font-mono">
+              <span className="inline-flex h-2 w-2 rounded-full bg-[var(--accent-green)] pulse-live" />
+              Auto-refresh via cache TTL
+            </div>
+            <button
+              onClick={() => setNotificationsOpen((open) => !open)}
+              className="relative inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs font-bold text-[var(--text-primary)] card-shadow"
+              aria-label="Open IPO notifications"
+            >
+              <Bell size={15} />
+              Alerts
+              {notifications.length > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent-red)] px-1 text-[10px] font-bold text-white">
+                  {notifications.length}
+                </span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 top-11 z-20 w-[min(92vw,380px)] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 card-shadow">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] font-mono">IPO Notifications</p>
+                  <button onClick={() => setNotificationsOpen(false)} className="text-[11px] text-[var(--text-dim)]">Close</button>
+                </div>
+                <div className="max-h-80 space-y-2 overflow-auto">
+                  {notifications.length ? notifications.map((note) => (
+                    <a key={`${note.title}-${note.url}`} href={note.url || "#"} target={note.url ? "_blank" : undefined} rel="noreferrer" className="block rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+                      <div className="mb-1"><Badge tone={note.tone}>{note.tone}</Badge></div>
+                      <p className="text-sm font-semibold leading-snug">{note.title}</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-dim)]">{note.detail}</p>
+                    </a>
+                  )) : <EmptyState>No active IPO alerts.</EmptyState>}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <header className="mb-6 border-y border-[var(--border-strong)] py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--accent-burgundy)] font-mono">IPO War Room</p>
-              <h1 className="font-display text-4xl font-bold tracking-tight md:text-5xl">Kissht IPO Command Center</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
-                Real-time monitoring of news, GMP, broker notes, YouTube coverage, subscription and risk signals.
-              </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex h-16 w-40 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-white px-4 card-shadow">
+                <img
+                  src="https://www.kissht.com/_next/static/media/logo-blue.b298452f.svg"
+                  alt="Kissht"
+                  className="max-h-9 w-full object-contain"
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--accent-burgundy)] font-mono">IPO War Room</p>
+                <h1 className="font-display text-4xl font-bold tracking-tight md:text-5xl">Kissht IPO Command Center</h1>
+                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
+                  Real-time monitoring of news, GMP, broker notes, YouTube coverage, subscription and risk signals.
+                </p>
+              </div>
             </div>
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
               <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-[11px] text-[var(--text-dim)] font-mono">

@@ -21,6 +21,12 @@ test("kissht risk classifier flags adverse IPO wording", () => {
   assert.ok(risk.keywords.includes("avoid"));
 });
 
+test("kissht risk classifier does not overflag generic regulatory mentions", () => {
+  const risk = classifyKisshtRisk("OnEMI Technology IPO price band announced; proceeds go to RBI regulated NBFC subsidiary");
+  assert.equal(risk.level, "Low");
+  assert.deepEqual(risk.keywords, []);
+});
+
 test("kissht sentiment classifier is deterministic", () => {
   assert.equal(classifyKisshtSentiment("Kissht IPO gets subscribe recommendation and strong subscription"), "Positive");
   assert.equal(classifyKisshtSentiment("Kissht IPO avoid recommendation after weak subscription"), "Negative");
@@ -33,6 +39,14 @@ test("gmp percentage calculation uses upper price band", () => {
   assert.equal(point.priceBand, 120);
   assert.equal(point.gmpPercent, 20);
   assert.equal(point.estimatedListingPrice, 144);
+});
+
+test("gmp parser handles IPO portal price band copy", () => {
+  const point = extractGmpPoint("OnEMI Technology Solutions (Kissht) IPO GMP Price (₹) 171 GMP 7 projected listing price ₹178", "LamfIndia", "https://example.com");
+  assert.equal(point.gmp, 7);
+  assert.equal(point.priceBand, 171);
+  assert.equal(point.gmpPercent, 4.09);
+  assert.equal(point.estimatedListingPrice, 178);
 });
 
 test("kissht dedupe groups similar source variants", () => {

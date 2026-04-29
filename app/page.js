@@ -21,6 +21,6 @@ export const metadata = {
 };
 
 export default async function Page() {
-  const intelligence = await getIntelligenceSnapshot({ allowStale: true });
+  const intelligence = await getIntelligenceSnapshot();
   return <DashboardClient initialIntelligence={intelligence} />;
 }

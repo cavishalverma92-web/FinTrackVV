@@ -90,7 +90,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 17;
+const CACHE_VERSION = 18;
 const ENABLE_HEAVY_SOURCE_SCRAPE = process.env.ENABLE_HEAVY_SOURCE_SCRAPE === "true";
 
 const RSS_FEEDS = [
@@ -632,7 +632,20 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   ]).finally(() => clearTimeout(timeout));
 }
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+function freshGoogleNewsUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (!url.hostname.includes("news.google.com") || !url.pathname.includes("/rss/search")) return rawUrl;
+    const query = url.searchParams.get("q") || "";
+    if (/\bwhen\s*:\s*\d+[hdwmy]\b/i.test(query)) return rawUrl;
+    url.searchParams.set("q", `${query} when:7d`.trim());
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 async function readIntelligenceCache({ ignoreTtl = false } = {}) {
   try {
@@ -1648,17 +1661,19 @@ function buildRatingChanges(newsItems) {
 
 async function fetchRssNews() {
   const results = await Promise.allSettled(RSS_FEEDS.map(async (feed) => {
-    const response = await fetchWithTimeout(feed.url, {
+    const url = freshGoogleNewsUrl(feed.url);
+    const response = await fetchWithTimeout(url, {
       headers: { "User-Agent": "LendingIQ/1.0 (+https://localhost)" },
-      next: { revalidate: 900 },
+      cache: "no-store",
     }, 5000);
 
     if (!response.ok) throw new Error(`${feed.source} returned ${response.status}`);
-    return parseFeed(await response.text(), feed);
+    return parseFeed(await response.text(), { ...feed, url });
   }));
 
   const health = results.map((result, index) => ({
     ...RSS_FEEDS[index],
+    url: freshGoogleNewsUrl(RSS_FEEDS[index].url),
     type: "RSS",
     sourceTier: sourceTierFor(RSS_FEEDS[index].source),
     status: result.status === "fulfilled" ? "ok" : "error",
@@ -1695,8 +1710,8 @@ async function fetchRssNews() {
 
 async function fetchGdeltNews() {
   const query = encodeURIComponent('(NBFC OR "digital lending" OR fintech OR "co-lending" OR "Reserve Bank of India" OR SEBI OR Kissht OR "Onemi Technologies" OR "Si Creva" OR Groww OR Zerodha OR Upstox OR "Angel One" OR "Kotak Securities" OR "ICICI Securities" OR "HDFC Securities") (India OR Indian)');
-  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=30&sort=HybridRel`;
-  const response = await fetchWithTimeout(url, { next: { revalidate: 900 } }, 6000);
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=30&sort=DateDesc`;
+  const response = await fetchWithTimeout(url, { cache: "no-store" }, 6000);
   if (!response.ok) throw new Error(`GDELT returned ${response.status}`);
 
   const json = await response.json();
@@ -1811,10 +1826,14 @@ export function dedupeAndRankNews(items) {
 
   return deduped
     .sort((a, b) => {
+      const aTs = a.publishedTs || a.ingestedTs || 0;
+      const bTs = b.publishedTs || b.ingestedTs || 0;
+      const ageDeltaHours = Math.abs(bTs - aTs) / 3600000;
+      if (ageDeltaHours > 6) return bTs - aTs;
       if (b.score !== a.score) return b.score - a.score;
-      return (b.publishedTs || 0) - (a.publishedTs || 0);
+      return bTs - aTs;
     })
-    .slice(0, 40);
+    .slice(0, 60);
 }
 
 async function fetchMarketData() {

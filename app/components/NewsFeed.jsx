@@ -202,10 +202,19 @@ export default function NewsFeed({
   onRefresh,
 }) {
   const [filter, setFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("Most Recent");
 
   const filteredNews = newsItems
     .filter((item) => itemMatchesSegment(item, filter))
-    .filter((item) => itemMatchesSearch(item, searchQuery));
+    .filter((item) => itemMatchesSearch(item, searchQuery))
+    .sort((a, b) => {
+      const aTs = a.publishedTs || a.ingestedTs || 0;
+      const bTs = b.publishedTs || b.ingestedTs || 0;
+      if (sortBy === "Most Recent") return bTs - aTs;
+      if (sortBy === "Oldest") return aTs - bTs;
+      if (sortBy === "Materiality") return (b.score || 0) - (a.score || 0) || bTs - aTs;
+      return ({ High: 3, Medium: 2, Low: 1 }[b.risk] || 0) - ({ High: 3, Medium: 2, Low: 1 }[a.risk] || 0) || bTs - aTs;
+    });
   const updatedLabel = formatUpdatedAt(updatedAt);
 
   return (
@@ -264,6 +273,19 @@ export default function NewsFeed({
             {f}
           </button>
         ))}
+        <label className="ml-auto inline-flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+          Sort
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+            className="rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1 text-[11px] font-semibold text-[var(--text-primary)]"
+          >
+            <option>Most Recent</option>
+            <option>Materiality</option>
+            <option>Highest Risk</option>
+            <option>Oldest</option>
+          </select>
+        </label>
       </div>
 
       {searchQuery.trim() && (

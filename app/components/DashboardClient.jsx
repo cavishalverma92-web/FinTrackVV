@@ -36,8 +36,8 @@ const INITIAL_DATA = {
   cache: null,
 };
 
-const AUTO_REFRESH_MS = 15 * 60 * 1000;
-const STALE_ON_LOAD_MS = 20 * 60 * 1000;
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+const STALE_ON_LOAD_MS = 10 * 60 * 1000;
 const SECTION_STALE_MS = 10 * 60 * 1000;
 
 function inferDataStatus(data) {

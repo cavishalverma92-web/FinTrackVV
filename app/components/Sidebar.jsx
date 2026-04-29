@@ -19,17 +19,25 @@ const ICONS = {
   RefreshCw,
 };
 
-export default function Sidebar({ activeTab, onTabChange, open = false, onClose, tabCounts = {} }) {
+function formatRefreshTime(value) {
+  if (!value) return "Awaited";
+  return new Date(value).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function Sidebar({ activeTab, onTabChange, open = false, onClose, tabCounts = {}, updatedAt }) {
   return (
     <>
       {open && (
         <div
-          className="fixed inset-0 bg-black/40 z-20 md:hidden"
+          className="fixed inset-0 bg-[var(--bg-overlay)] z-20 md:hidden"
           onClick={onClose}
         />
       )}
       <aside className={`
-        w-60 border-r border-[var(--border-subtle)] bg-[rgba(255,253,248,0.72)] flex flex-col py-5
+        w-60 border-r border-[var(--border-subtle)] bg-[var(--bg-translucent)] backdrop-blur flex flex-col py-5
         md:relative md:flex md:translate-x-0
         fixed inset-y-0 left-0 z-30 transition-transform duration-200
         ${open ? "flex translate-x-0" : "-translate-x-full md:translate-x-0"}
@@ -89,7 +97,7 @@ export default function Sidebar({ activeTab, onTabChange, open = false, onClose,
             Sources: RBI, SEBI, CRISIL, ICRA, CARE, Bloomberg, Reuters, NSE, BSE
           </p>
           <p className="text-[10px] text-[var(--text-dim)] font-mono mt-2">
-            Last refresh: {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST
+            Data refresh: {formatRefreshTime(updatedAt)} IST
           </p>
         </div>
       </aside>

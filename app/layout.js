@@ -11,8 +11,15 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("darkMode")==="true"){document.documentElement.classList.add("dark")}}catch(e){}`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

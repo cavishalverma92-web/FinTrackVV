@@ -9,6 +9,11 @@
   --bg-card: #fffdf8;
   --bg-card-hover: #fff3e2;
   --bg-elevated: #f4eadb;
+  --bg-translucent: rgba(255, 253, 248, 0.82);
+  --bg-input: rgba(255, 255, 255, 0.58);
+  --bg-overlay: rgba(36, 31, 26, 0.42);
+  --bg-grid: rgba(143, 29, 44, 0.035);
+  --bg-logo: #ffffff;
   --paper-highlight: #fff0d8;
   --border-subtle: #dfd0bd;
   --border-hover: #b79a7a;
@@ -21,20 +26,33 @@
   --text-primary: #241f1a;
   --text-secondary: #50473d;
   --text-dim: #7a6d5e;
+  --shadow-soft: rgba(73, 50, 26, 0.08);
 }
 
 .dark {
-  --bg-primary: #15110d;
-  --bg-card: #211a14;
-  --bg-card-hover: #2a2118;
-  --bg-elevated: #30261c;
-  --paper-highlight: #342719;
-  --border-subtle: #46382b;
-  --border-hover: #6b5744;
-  --border-strong: #b79a7a;
-  --text-primary: #f8efe4;
-  --text-secondary: #dccdbb;
-  --text-dim: #aa9986;
+  color-scheme: dark;
+  --bg-primary: #111614;
+  --bg-card: #171d1a;
+  --bg-card-hover: #202822;
+  --bg-elevated: #253027;
+  --bg-translucent: rgba(23, 29, 26, 0.86);
+  --bg-input: rgba(255, 247, 237, 0.055);
+  --bg-overlay: rgba(0, 0, 0, 0.6);
+  --bg-grid: rgba(217, 196, 168, 0.035);
+  --bg-logo: #f8fbff;
+  --paper-highlight: #243428;
+  --border-subtle: #344239;
+  --border-hover: #6d806f;
+  --border-strong: #c6b292;
+  --accent-green: #5bc49b;
+  --accent-red: #ff7a7a;
+  --accent-amber: #d8a45a;
+  --accent-blue: #7cb7dc;
+  --accent-burgundy: #d07a86;
+  --text-primary: #f5efe4;
+  --text-secondary: #d8cab8;
+  --text-dim: #a99b88;
+  --shadow-soft: rgba(0, 0, 0, 0.36);
 }
 
 * {
@@ -50,7 +68,7 @@ html {
 body {
   min-height: 100vh;
   background:
-    linear-gradient(90deg, rgba(143, 29, 44, 0.035) 0 1px, transparent 1px 100%),
+    linear-gradient(90deg, var(--bg-grid) 0 1px, transparent 1px 100%),
     var(--bg-primary);
   background-size: 72px 72px, auto;
   color: var(--text-primary);
@@ -85,6 +103,10 @@ input:focus-visible {
 ::-webkit-scrollbar-thumb {
   background: #cbb89f;
   border-radius: 999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #526357;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -152,15 +174,11 @@ input:focus-visible {
   background-color: var(--bg-card-hover);
   border-color: var(--border-hover);
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(73, 50, 26, 0.08);
+  box-shadow: 0 10px 24px var(--shadow-soft);
 }
 
 .card-shadow {
   box-shadow: 0 1px 0 rgba(36, 31, 26, 0.04);
-}
-
-.dark .card-hover:hover {
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
 }
 
 .cat-regulation  { box-shadow: inset 4px 0 0 var(--accent-amber); }

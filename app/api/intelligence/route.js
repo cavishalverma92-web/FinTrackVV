@@ -90,7 +90,7 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 19;
+const CACHE_VERSION = 20;
 const ENABLE_HEAVY_SOURCE_SCRAPE = process.env.ENABLE_HEAVY_SOURCE_SCRAPE === "true";
 
 const RSS_FEEDS = [
@@ -212,6 +212,26 @@ const RSS_FEEDS = [
   {
     source: "Google News Business Today BFSI",
     url: "https://news.google.com/rss/search?q=site%3Abusinesstoday.in%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Financial Express BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Afinancialexpress.com%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%20OR%20SEBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Zee Business BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Azeebiz.com%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News IIFL BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Aindiainfoline.com%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Capital Market BFSI",
+    url: "https://news.google.com/rss/search?q=site%3Acapitalmarket.com%20%28bank%20OR%20NBFC%20OR%20fintech%20OR%20lending%20OR%20brokerage%20OR%20IPO%20OR%20RBI%29%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Policy",
   },
   {
@@ -920,6 +940,10 @@ const SOURCE_WEIGHTS = {
   "Google News Moneycontrol BFSI": 22,
   "Google News ET BFSI Search": 24,
   "Google News Business Today BFSI": 20,
+  "Google News Financial Express BFSI": 20,
+  "Google News Zee Business BFSI": 18,
+  "Google News IIFL BFSI": 18,
+  "Google News Capital Market BFSI": 18,
   "Google News IPO BFSI": 22,
   "Google News Business Standard": 18,
   "Google News Financial Express": 16,
@@ -1396,6 +1420,10 @@ export function isFinancialServicesMaterial(item = {}) {
     "Google News Moneycontrol BFSI",
     "Google News ET BFSI Search",
     "Google News Business Today BFSI",
+    "Google News Financial Express BFSI",
+    "Google News Zee Business BFSI",
+    "Google News IIFL BFSI",
+    "Google News Capital Market BFSI",
     "Google News IPO BFSI",
     "Google News Inc42 Fintech",
     "Google News YourStory Fintech",
@@ -1730,6 +1758,7 @@ function buildRatingChanges(newsItems) {
 }
 
 async function fetchRssNews() {
+  const fetchedAt = new Date().toISOString();
   const results = await Promise.allSettled(RSS_FEEDS.map(async (feed) => {
     const url = freshGoogleNewsUrl(feed.url);
     const response = await fetchWithTimeout(url, {
@@ -1748,6 +1777,7 @@ async function fetchRssNews() {
     sourceTier: sourceTierFor(RSS_FEEDS[index].source),
     status: result.status === "fulfilled" ? "ok" : "error",
     itemCount: result.status === "fulfilled" ? result.value.length : 0,
+    lastFetchedAt: fetchedAt,
     error: result.status === "rejected" ? result.reason?.message || "Source failed" : null,
   }));
   const rawItems = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
@@ -1799,6 +1829,7 @@ async function fetchGdeltNews() {
 }
 
 async function fetchHtmlSourceNews() {
+  const fetchedAt = new Date().toISOString();
   const results = await Promise.allSettled(HTML_SOURCES.map(async (source) => {
     const response = await fetchWithTimeout(source.url, {
       headers: {
@@ -1820,6 +1851,7 @@ async function fetchHtmlSourceNews() {
     sourceTier: "direct",
     status: result.status === "fulfilled" ? "ok" : "error",
     itemCount: result.status === "fulfilled" ? result.value.length : 0,
+    lastFetchedAt: fetchedAt,
     error: result.status === "rejected" ? result.reason?.message || "Source failed" : null,
   }));
 
@@ -1894,7 +1926,7 @@ export function dedupeAndRankNews(items) {
     if (!duplicate.url && item.url) duplicate.url = item.url;
   }
 
-  return deduped
+  const sorted = deduped
     .sort((a, b) => {
       const aTs = a.publishedTs || a.ingestedTs || 0;
       const bTs = b.publishedTs || b.ingestedTs || 0;
@@ -1902,8 +1934,35 @@ export function dedupeAndRankNews(items) {
       if (ageDeltaHours > 6) return bTs - aTs;
       if (b.score !== a.score) return b.score - a.score;
       return bTs - aTs;
-    })
-    .slice(0, 60);
+    });
+
+  return diversifyRankedNews(sorted, 60);
+}
+
+function sourceCapFor(item) {
+  if (["RBI", "SEBI", "BSE", "NSE"].includes(item.source)) return 8;
+  if (String(item.source || "").startsWith("Google News")) return 10;
+  return 12;
+}
+
+function diversifyRankedNews(items, limit = 60) {
+  const selected = [];
+  const overflow = [];
+  const counts = new Map();
+
+  for (const item of items) {
+    const source = item.source || "Unknown";
+    const count = counts.get(source) || 0;
+    if (count < sourceCapFor(item)) {
+      selected.push(item);
+      counts.set(source, count + 1);
+    } else {
+      overflow.push(item);
+    }
+    if (selected.length >= limit) return selected.slice(0, limit);
+  }
+
+  return [...selected, ...overflow].slice(0, limit);
 }
 
 async function fetchMarketData() {
@@ -2586,6 +2645,7 @@ function buildSourceStats(sources = []) {
 }
 
 function skippedHtmlHealth() {
+  const skippedAt = new Date().toISOString();
   return HTML_SOURCES.map((source) => ({
     source: source.source,
     url: source.url,
@@ -2594,6 +2654,7 @@ function skippedHtmlHealth() {
     sourceTier: "direct",
     status: "skipped",
     itemCount: 0,
+    lastFetchedAt: skippedAt,
     error: "Skipped on interactive refresh",
   }));
 }
@@ -2664,6 +2725,7 @@ async function buildIntelligencePayload() {
         ? dedupedNews
         : filterPortalItems(NEWS_ITEMS)
     ).map(applyTimeFields);
+    const refreshedAt = new Date().toISOString();
     const apiHealth = [
       {
         source: "BSE Filings",
@@ -2671,6 +2733,7 @@ async function buildIntelligencePayload() {
         type: "API",
         status: ENABLE_HEAVY_SOURCE_SCRAPE ? (bseResult.status === "fulfilled" ? "ok" : "error") : "skipped",
         itemCount: bseResult.status === "fulfilled" ? bseResult.value.length : 0,
+        lastFetchedAt: refreshedAt,
         error: ENABLE_HEAVY_SOURCE_SCRAPE
           ? (bseResult.status === "rejected" ? bseResult.reason?.message || "BSE filings failed" : null)
           : "Skipped on interactive refresh",
@@ -2681,6 +2744,7 @@ async function buildIntelligencePayload() {
         type: "API",
         status: ENABLE_HEAVY_SOURCE_SCRAPE ? (nseResult.status === "fulfilled" ? "ok" : "error") : "skipped",
         itemCount: nseResult.status === "fulfilled" ? nseResult.value.length : 0,
+        lastFetchedAt: refreshedAt,
         error: ENABLE_HEAVY_SOURCE_SCRAPE
           ? (nseResult.status === "rejected" ? nseResult.reason?.message || "NSE filings failed" : null)
           : "Skipped on interactive refresh",
@@ -2690,6 +2754,7 @@ async function buildIntelligencePayload() {
         type: "API",
         status: gdeltNewsResult.status === "fulfilled" ? "ok" : "error",
         itemCount: gdeltNewsResult.status === "fulfilled" ? gdeltNewsResult.value.length : 0,
+        lastFetchedAt: refreshedAt,
         error: gdeltNewsResult.status === "rejected" ? gdeltNewsResult.reason?.message || "GDELT failed" : null,
       },
       {
@@ -2700,6 +2765,7 @@ async function buildIntelligencePayload() {
         type: "API",
         status: marketResult.status === "fulfilled" ? "ok" : "error",
         itemCount: marketResult.status === "fulfilled" ? marketResult.value.peerData.length : 0,
+        lastFetchedAt: refreshedAt,
         error: marketResult.status === "rejected" ? marketResult.reason?.message || "Market data failed" : null,
       },
       {
@@ -2708,6 +2774,7 @@ async function buildIntelligencePayload() {
         type: "API",
         status: globalResult.status === "fulfilled" ? "ok" : "error",
         itemCount: globalResult.status === "fulfilled" ? globalResult.value.length : 0,
+        lastFetchedAt: refreshedAt,
         error: globalResult.status === "rejected" ? globalResult.reason?.message || "FX data failed" : null,
       },
     ];

@@ -57,7 +57,7 @@ export default function DashboardClient({ initialIntelligence }) {
   const [selectedNews, setSelectedNews] = useState(null);
   const [showAlerts, setShowAlerts] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(null);
   const [intelligence, setIntelligence] = useState({ ...INITIAL_DATA, ...(initialIntelligence || {}) });
   const [dataStatus, setDataStatus] = useState(initialIntelligence ? inferDataStatus(initialIntelligence) : "loading");
   const [dataError, setDataError] = useState(initialIntelligence?.error || null);
@@ -108,10 +108,11 @@ export default function DashboardClient({ initialIntelligence }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("darkMode");
-    if (saved === "true") setDarkMode(true);
+    setDarkMode(saved === "true");
   }, []);
 
   useEffect(() => {
+    if (darkMode === null) return;
     document.documentElement.classList.toggle("dark", darkMode);
     localStorage.setItem("darkMode", darkMode);
   }, [darkMode]);
@@ -140,7 +141,7 @@ export default function DashboardClient({ initialIntelligence }) {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleAlerts={() => setShowAlerts(!showAlerts)}
-        darkMode={darkMode}
+        darkMode={darkMode === true}
         onToggleDark={() => setDarkMode((d) => !d)}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((s) => !s)}
@@ -173,6 +174,7 @@ export default function DashboardClient({ initialIntelligence }) {
           onTabChange={handleTabChange}
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          updatedAt={intelligence.updatedAt}
           tabCounts={{
             feed: intelligence.newsItems.length,
             summary: intelligence.materialUpdates.length,
@@ -288,7 +290,7 @@ export default function DashboardClient({ initialIntelligence }) {
       </div>
 
       {intelligence.sources && (
-        <div className="border-t border-[var(--border-subtle)] bg-[rgba(255,253,248,0.78)] px-6 py-2">
+        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-translucent)] px-6 py-2 backdrop-blur">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-[9px] font-black text-[var(--text-dim)] uppercase tracking-widest font-mono flex-shrink-0">
               Live Sources

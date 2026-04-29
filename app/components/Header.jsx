@@ -37,7 +37,7 @@ export default function Header({
         </div>
       </div>
 
-      <div className="hidden md:flex items-center gap-2 bg-white/55 border border-[var(--border-subtle)] rounded-md px-3 py-2 w-96">
+      <div className="hidden md:flex items-center gap-2 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-md px-3 py-2 w-96">
         <Search size={14} className="text-[var(--text-dim)]" />
         <input
           type="text"

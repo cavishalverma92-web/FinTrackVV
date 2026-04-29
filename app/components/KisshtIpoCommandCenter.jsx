@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -11,11 +11,13 @@ import {
   ExternalLink,
   FileText,
   Filter,
+  Moon,
   Newspaper,
   Radio,
   RefreshCw,
   ShieldAlert,
   Signal,
+  Sun,
   TrendingUp,
   Video,
 } from "lucide-react";
@@ -129,6 +131,18 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("darkMode");
+    setDarkMode(saved === "true");
+  }, []);
+
+  useEffect(() => {
+    if (darkMode === null) return;
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
 
   const news = snapshot.news || [];
   const risk = snapshot.risk || {};
@@ -228,6 +242,13 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setDarkMode((value) => !value)}
+              className="inline-flex items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 text-[var(--text-dim)] card-shadow hover:border-[var(--border-hover)] hover:text-[var(--text-secondary)]"
+              aria-label="Toggle dark mode"
+            >
+              {darkMode === true ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
             {notificationsOpen && (
               <div className="absolute right-0 top-11 z-20 w-[min(92vw,380px)] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 card-shadow">
                 <div className="mb-2 flex items-center justify-between">
@@ -251,7 +272,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
         <header className="mb-6 border-y border-[var(--border-strong)] py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex h-16 w-40 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-white px-4 card-shadow">
+              <div className="flex h-16 w-40 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-logo)] px-4 card-shadow">
                 <img
                   src="https://www.kissht.com/_next/static/media/logo-blue.b298452f.svg"
                   alt="Kissht"

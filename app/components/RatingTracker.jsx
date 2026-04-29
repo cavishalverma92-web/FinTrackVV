@@ -9,11 +9,16 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 
 export default function RatingTracker({ ratingChanges = [] }) {
   // Track which rating item is expanded to show rationale
   const [expandedIndex, setExpandedIndex] = useState(null);
+  const sourceLinkFor = (rating) => rating.url || rating.sourceUrl || (
+    rating.entity
+      ? `https://news.google.com/search?q=${encodeURIComponent(`${rating.entity} ${rating.agency || ""} credit rating India`)}`
+      : null
+  );
 
   const toggleExpand = (index) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -68,7 +73,9 @@ export default function RatingTracker({ ratingChanges = [] }) {
 
       {/* ── Rating Changes List ── */}
       <div className="flex flex-col gap-2">
-        {ratingChanges.map((rating, index) => (
+        {ratingChanges.map((rating, index) => {
+          const sourceLink = sourceLinkFor(rating);
+          return (
           <div
             key={index}
             className={`
@@ -100,9 +107,20 @@ export default function RatingTracker({ ratingChanges = [] }) {
                 <p className="text-sm font-semibold text-[var(--text-primary)]">
                   {rating.entity}
                 </p>
-                <p className="text-[11px] text-[var(--text-dim)]">
-                  {rating.agency} · {rating.date}
-                </p>
+                <div className="flex items-center gap-2 text-[11px] text-[var(--text-dim)] flex-wrap">
+                  <span>{rating.agency} · {rating.date}</span>
+                  {sourceLink && (
+                    <a
+                      href={sourceLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex items-center gap-1 font-semibold text-[var(--accent-blue)] hover:underline"
+                    >
+                      {rating.url || rating.sourceUrl ? "Source" : "Search source"} <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
               </div>
 
               {/* Rating change */}
@@ -154,7 +172,8 @@ export default function RatingTracker({ ratingChanges = [] }) {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

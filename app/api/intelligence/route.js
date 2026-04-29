@@ -25,10 +25,20 @@ const REDIS_NEWS_KEY = "lendingiq:news:archive";
 const REDIS_BRIEF_PREFIX = "lendingiq:brief:";
 const ARCHIVE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+function withDeadline(promise, timeoutMs, label = "Operation") {
+  let timeout;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timeout));
+}
+
 async function loadNewsArchive() {
   if (!redis) return [];
   try {
-    const data = await redis.get(REDIS_NEWS_KEY);
+    const data = await withDeadline(redis.get(REDIS_NEWS_KEY), 2000, "Redis news archive read");
     if (!Array.isArray(data)) return [];
     const cutoff = Date.now() - ARCHIVE_TTL_MS;
     return data.filter((item) => !shouldExcludePortalItem(item) && item.publishedTs && item.publishedTs > cutoff);
@@ -50,7 +60,7 @@ async function saveNewsArchive(freshItems) {
       return item.publishedTs && item.publishedTs > cutoff;
     });
     // Store for 25h (Redis TTL) so we never lose items mid-window
-    await redis.set(REDIS_NEWS_KEY, merged, { ex: 25 * 60 * 60 });
+    await withDeadline(redis.set(REDIS_NEWS_KEY, merged, { ex: 25 * 60 * 60 }), 2000, "Redis news archive write");
   } catch {
     // fail silently — fresh items still served
   }
@@ -59,7 +69,7 @@ async function saveNewsArchive(freshItems) {
 async function loadCachedBrief(hash) {
   if (!redis || !hash) return null;
   try {
-    return await redis.get(`${REDIS_BRIEF_PREFIX}${hash}`);
+    return await withDeadline(redis.get(`${REDIS_BRIEF_PREFIX}${hash}`), 1500, "Redis brief read");
   } catch {
     return null;
   }
@@ -68,7 +78,7 @@ async function loadCachedBrief(hash) {
 async function saveCachedBrief(hash, brief) {
   if (!redis || !hash || !brief) return;
   try {
-    await redis.set(`${REDIS_BRIEF_PREFIX}${hash}`, brief, { ex: 25 * 60 * 60 });
+    await withDeadline(redis.set(`${REDIS_BRIEF_PREFIX}${hash}`, brief, { ex: 25 * 60 * 60 }), 1500, "Redis brief write");
   } catch {
     // no-op
   }
@@ -80,7 +90,8 @@ export const runtime = "nodejs";
 
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
 const CACHE_FILE = path.join(CACHE_DIR, "intelligence.json");
-const CACHE_VERSION = 16;
+const CACHE_VERSION = 17;
+const ENABLE_HEAVY_SOURCE_SCRAPE = process.env.ENABLE_HEAVY_SOURCE_SCRAPE === "true";
 
 const RSS_FEEDS = [
   {
@@ -154,13 +165,23 @@ const RSS_FEEDS = [
     defaultCategory: "Fundraise",
   },
   {
+    source: "Google News Kissht",
+    url: "https://news.google.com/rss/search?q=%28Kissht%20OR%20%22Onemi%20Technologies%22%20OR%20%22Onemi%20Technology%22%20OR%20ONEMI%20OR%20%22Si%20Creva%22%20OR%20%22Si-Creva%22%20OR%20SiCreva%29%20%28India%20OR%20lending%20OR%20RBI%20OR%20rating%20OR%20funding%20OR%20fintech%29%20when%3A365d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Fundraise",
+  },
+  {
     source: "Google News Banks",
     url: "https://news.google.com/rss/search?q=India%20banks%20RBI%20lending%20credit%20HDFC%20ICICI%20SBI%20Axis&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Policy",
   },
   {
     source: "Google News Broking",
-    url: "https://news.google.com/rss/search?q=%28Groww%20OR%20Zerodha%20OR%20Upstox%20OR%20Dhan%20OR%20%22Angel%20One%22%20OR%20Nuvama%20OR%20%22Kotak%20Securities%22%20OR%20%22ICICI%20Securities%22%20OR%20%22HDFC%20Securities%22%20OR%20%22Motilal%20Oswal%22%20OR%20Sharekhan%20OR%20%225paisa%22%29%20%28broking%20OR%20brokerage%20OR%20stockbroker%20OR%20%22trading%20app%22%20OR%20demat%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    url: "https://news.google.com/rss/search?q=%28Groww%20OR%20Zerodha%20OR%20Upstox%20OR%20Dhan%20OR%20DhanHQ%20OR%20%22Angel%20One%22%20OR%20Nuvama%20OR%20%22Kotak%20Securities%22%20OR%20%22ICICI%20Securities%22%20OR%20%22ICICI%20Direct%22%20OR%20%22HDFC%20Securities%22%20OR%20%22Motilal%20Oswal%22%20OR%20Sharekhan%20OR%20%225paisa%22%20OR%20Fyers%20OR%20%22Alice%20Blue%22%20OR%20Samco%20OR%20Geojit%20OR%20%22Axis%20Securities%22%20OR%20%22SBI%20Securities%22%20OR%20%22IIFL%20Securities%22%29%20%28broking%20OR%20brokerage%20OR%20stockbroker%20OR%20%22stock%20broker%22%20OR%20%22discount%20broker%22%20OR%20%22trading%20app%22%20OR%20demat%20OR%20%22active%20clients%22%20OR%20NSE%20OR%20SEBI%29%20India%20when%3A45d&hl=en-IN&gl=IN&ceid=IN:en",
+    defaultCategory: "Policy",
+  },
+  {
+    source: "Google News Brokerage Firms",
+    url: "https://news.google.com/rss/search?q=%28%22stock%20broker%22%20OR%20brokerage%20OR%20%22discount%20broker%22%20OR%20%22trading%20app%22%29%20%28Groww%20OR%20Zerodha%20OR%20Upstox%20OR%20%22Angel%20One%22%20OR%20%22Kotak%20Securities%22%20OR%20%22ICICI%20Securities%22%20OR%20%22HDFC%20Securities%22%20OR%20%22Motilal%20Oswal%22%20OR%20Sharekhan%20OR%20%225paisa%22%20OR%20Fyers%20OR%20Samco%20OR%20Nuvama%29%20India%20when%3A45d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Policy",
   },
   {
@@ -261,7 +282,7 @@ const RSS_FEEDS = [
   // ── Digital Lenders ──
   {
     source: "Google News Digital Lenders",
-    url: "https://news.google.com/rss/search?q=%28KreditBee%20OR%20MoneyView%20OR%20Kissht%20OR%20Navi%20OR%20Fibe%20OR%20%22Early%20Salary%22%20OR%20StashFin%20OR%20CASHe%20OR%20LazyPay%20OR%20Simpl%20OR%20Slice%20OR%20Freo%20OR%20%22Aye%20Finance%22%20OR%20Lendingkart%20OR%20FlexiLoans%20OR%20Indifi%20OR%20NeoGrowth%20OR%20Oxyzo%20OR%20Mintifi%20OR%20Progcap%29%20India%20when%3A14d&hl=en-IN&gl=IN&ceid=IN:en",
+    url: "https://news.google.com/rss/search?q=%28KreditBee%20OR%20MoneyView%20OR%20Kissht%20OR%20%22Onemi%20Technologies%22%20OR%20%22Si%20Creva%22%20OR%20Navi%20OR%20Fibe%20OR%20%22Early%20Salary%22%20OR%20StashFin%20OR%20CASHe%20OR%20LazyPay%20OR%20Simpl%20OR%20Slice%20OR%20Freo%20OR%20%22Aye%20Finance%22%20OR%20Lendingkart%20OR%20FlexiLoans%20OR%20Indifi%20OR%20NeoGrowth%20OR%20Oxyzo%20OR%20Mintifi%20OR%20Progcap%29%20India%20when%3A45d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Fundraise",
   },
   {
@@ -714,7 +735,8 @@ const RELEVANCE_WORDS = [
   "ncd", "msme", "co-lending", "rating", "debt", "bond", "asset quality", "npa",
   "mfi", "microfinance", "hfc", "housing finance", "sidbi", "nhb", "pib",
   // Digital lenders
-  "digital lender", "kreditbee", "moneyview", "kissht", "navi", "fibe", "stashfin",
+  "digital lender", "kreditbee", "moneyview", "kissht", "onemi", "onemi technologies",
+  "onemi technology", "si creva", "si-creva", "sicreva", "navi", "fibe", "stashfin",
   "cashe", "lazypay", "simpl", "lendingkart", "flexiloans", "indifi", "neogrowth",
   "oxyzo", "mintifi", "progcap", "yubi", "credavenue", "northern arc", "vivriti",
   "getvantage", "recur club", "rupeek", "zestmoney", "liquiloans", "lendbox", "faircent",
@@ -741,7 +763,9 @@ const RELEVANCE_WORDS = [
   "zerodha", "groww", "upstox", "dhanhq", "dhan app", "dhan broking", "dhann",
   "angel one", "angel broking", "nuvama", "kotak securities", "icici securities",
   "icici direct", "hdfc securities", "motilal oswal", "sharekhan", "5paisa",
-  "geojit", "samco", "stock broker", "stockbroker", "brokerage", "trading app",
+  "geojit", "samco", "alice blue", "fyers", "axis securities", "sbi securities",
+  "iifl securities", "bob capital", "bobcaps", "choice broking", "stock broker",
+  "stockbroker", "discount broker", "full-service broker", "brokerage", "trading app",
 ];
 
 const RATING_AGENCY_TERMS = [
@@ -758,6 +782,7 @@ const BFSI_ENTITY_TERMS = [
   "payment gateway", "upi", "wealthtech", "broking", "brokerage", "stock broker", "stockbroker",
   "trading app", "discount broker", "full-service broker", "demat", "insurance", "asset management",
   "amc", "mutual fund", "lending service provider", "lsp", "dlg", "co-lending", "co lending",
+  "kissht", "onemi", "onemi technologies", "onemi technology", "si creva", "si-creva", "sicreva",
   "loan book", "aum", "gnpa", "nnpa", "capital adequacy", "provisioning", "collection efficiency",
   "disbursement", "asset quality", "cost of funds", "credit cost",
 ];
@@ -822,8 +847,10 @@ const SOURCE_WEIGHTS = {
   Mint: 22,
   "Google News NBFC": 18,
   "Google News Digital Lending": 18,
+  "Google News Kissht": 32,
   "Google News Banks": 18,
   "Google News Broking": 20,
+  "Google News Brokerage Firms": 20,
   "Google News Financial Services": 16,
   "Google News Business Standard": 18,
   "Google News Financial Express": 16,
@@ -922,7 +949,7 @@ function parseFeed(xml, feed) {
 }
 
 function parseHtmlSource(html, source) {
-  const matches = [...html.matchAll(/<a[^>]+href=["'](https?:\/\/[^"'<> ]+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+  const matches = html.matchAll(/<a\b[^>]*href=["'](https?:\/\/[^"'<> ]+)["'][^>]*>([^<]{18,240})<\/a>/gi);
   const seen = new Set();
   const items = [];
 
@@ -998,6 +1025,7 @@ export function classifySector(text, category) {
   if (["vehicle finance", "commercial vehicle", "cv finance", "mahindra finance", "shriram finance"].some((word) => lower.includes(word))) return "Vehicle Finance";
   if (["housing finance", "home loan", "hfc ", " hfc", "aavas", "aptus", "home first", "can fin", "lic housing", "pnb housing"].some((word) => lower.includes(word))) return "HFCs";
   if (["microfinance", "nbfc-mfi", "mfi ", " mfi", "creditaccess", "spandana", "fusion finance", "muthoot microfin", "arohan"].some((word) => lower.includes(word))) return "MFIs";
+  if (["kissht", "onemi", "onemi technologies", "onemi technology", "si creva", "si-creva", "sicreva"].some((word) => lower.includes(word))) return "Kissht";
 
   // AI & Tech — broad FS/finance technology signals
   if (
@@ -1020,7 +1048,7 @@ export function classifySector(text, category) {
 
   // Digital Lenders
   if ([
-    "moneyview", "money view", "kissht", "kreditbee",
+    "moneyview", "money view", "kreditbee",
     "navi fintech", "navi app", "navi technologies", "navi mutual fund",
     "navi loan", "navi insurance", "navi.com", "sachin bansal navi",
     "lendingkart", "digital lending", "fintech lender", "digital lender",
@@ -1067,8 +1095,10 @@ export function classifySector(text, category) {
     "zerodha", "groww", "upstox", "dhanhq", "dhan app", "dhan broking", "dhann", "angel one", "angel broking",
     "nuvama", "kotak securities", "icici securities", "hdfc securities", "motilal oswal",
     "sharekhan", "5paisa", "five paisa", "geojit", "samco", "alice blue",
-    "iifl securities", "axis securities", "sbi securities", "edelweiss broking",
-    "broking", "brokerage", "stock broker", "stockbroker", "trading app", "demat",
+    "fyers", "iifl securities", "axis securities", "sbi securities", "edelweiss broking",
+    "bob capital", "bobcaps", "choice broking", "jm financial services", "phillipcapital",
+    "broking", "brokerage", "stock broker", "stockbroker", "discount broker",
+    "full-service broker", "trading app", "demat",
   ].some((word) => lower.includes(word))) return "Broking";
   if (["insurance", "insurtech", "policybazaar", "pb fintech", "hdfc life", "sbi life", "star health"].some((word) => lower.includes(word))) return "Insurance";
   if (["asset management", "mutual fund", "amc", "hdfc amc", "nippon india amc", "uti amc"].some((word) => lower.includes(word))) return "Asset Management";
@@ -1283,7 +1313,15 @@ export function isFinancialServicesMaterial(item = {}) {
   if (hasRatingAgency) return hasCoreBfsiTerm || hasKnownEntity;
   if (hasKnownEntity && highSignalEvent) return true;
   if (hasCoreBfsiTerm && highSignalEvent) return true;
-  return hasCoreBfsiTerm && ["ET BFSI", "BusinessLine", "Financial Express Direct", "Moneycontrol Banks Direct", "Google News Broking"].includes(source);
+  return hasCoreBfsiTerm && [
+    "ET BFSI",
+    "BusinessLine",
+    "Financial Express Direct",
+    "Moneycontrol Banks Direct",
+    "Google News Kissht",
+    "Google News Broking",
+    "Google News Brokerage Firms",
+  ].includes(source);
 }
 
 function filterPortalItems(items = []) {
@@ -1361,7 +1399,7 @@ const WATCHLIST_ENTITIES = [
   { name: "CreditAccess Grameen", group: "MFI", keywords: ["creditaccess", "creditaccess grameen"] },
   { name: "Five-Star Business Finance", group: "NBFC", keywords: ["five-star", "five star", "fivestar"] },
   { name: "Moneyview", group: "Digital Lender", keywords: ["moneyview", "money view"] },
-  { name: "Kissht", group: "Digital Lender", keywords: ["kissht"] },
+  { name: "Kissht", group: "Digital Lender", keywords: ["kissht", "onemi", "onemi technologies", "onemi technology", "si creva", "si-creva", "sicreva"] },
   { name: "KreditBee", group: "Digital Lender", keywords: ["kreditbee", "krazybee"] },
   { name: "Navi", group: "Digital Lender", keywords: ["navi fintech", "navi"] },
   { name: "Fibe", group: "Digital Lender", keywords: ["fibe", "earlysalary", "early salary"] },
@@ -1374,7 +1412,7 @@ const WATCHLIST_ENTITIES = [
   { name: "Groww", group: "Broking", keywords: ["groww"] },
   { name: "Zerodha", group: "Broking", keywords: ["zerodha"] },
   { name: "Upstox", group: "Broking", keywords: ["upstox", "rksv"] },
-  { name: "Dhan", group: "Broking", keywords: ["dhanhq", "dhan app", "dhan broking", "raise financial services"] },
+  { name: "Dhan", group: "Broking", keywords: ["dhanhq", "dhan app", "dhan broking", "dhann", "raise financial services"] },
   { name: "Angel One", group: "Broking", keywords: ["angel one", "angel broking"] },
   { name: "Kotak Securities", group: "Broking", keywords: ["kotak securities"] },
   { name: "ICICI Securities", group: "Broking", keywords: ["icici securities", "icici direct"] },
@@ -1382,6 +1420,13 @@ const WATCHLIST_ENTITIES = [
   { name: "Motilal Oswal", group: "Broking", keywords: ["motilal oswal"] },
   { name: "Sharekhan", group: "Broking", keywords: ["sharekhan"] },
   { name: "5paisa", group: "Broking", keywords: ["5paisa", "five paisa"] },
+  { name: "Fyers", group: "Broking", keywords: ["fyers"] },
+  { name: "Alice Blue", group: "Broking", keywords: ["alice blue"] },
+  { name: "Samco", group: "Broking", keywords: ["samco"] },
+  { name: "Geojit", group: "Broking", keywords: ["geojit"] },
+  { name: "Axis Securities", group: "Broking", keywords: ["axis securities"] },
+  { name: "SBI Securities", group: "Broking", keywords: ["sbi securities"] },
+  { name: "IIFL Securities", group: "Broking", keywords: ["iifl securities"] },
   { name: "HDFC Bank", group: "Bank", keywords: ["hdfc bank"] },
   { name: "ICICI Bank", group: "Bank", keywords: ["icici bank"] },
   { name: "SBI", group: "Bank", keywords: ["sbi", "state bank of india"] },
@@ -1594,6 +1639,9 @@ function buildRatingChanges(newsItems) {
         date: item.time,
         rationale: item.tldr,
         entity,
+        url: item.url,
+        sourceUrl: item.url,
+        source: item.source,
       };
     });
 }
@@ -1646,7 +1694,7 @@ async function fetchRssNews() {
 }
 
 async function fetchGdeltNews() {
-  const query = encodeURIComponent('(NBFC OR "digital lending" OR fintech OR "co-lending" OR "Reserve Bank of India" OR SEBI) (India OR Indian)');
+  const query = encodeURIComponent('(NBFC OR "digital lending" OR fintech OR "co-lending" OR "Reserve Bank of India" OR SEBI OR Kissht OR "Onemi Technologies" OR "Si Creva" OR Groww OR Zerodha OR Upstox OR "Angel One" OR "Kotak Securities" OR "ICICI Securities" OR "HDFC Securities") (India OR Indian)');
   const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${query}&mode=ArtList&format=json&maxrecords=30&sort=HybridRel`;
   const response = await fetchWithTimeout(url, { next: { revalidate: 900 } }, 6000);
   if (!response.ok) throw new Error(`GDELT returned ${response.status}`);
@@ -1809,7 +1857,9 @@ async function fetchMarketData() {
   }
 
   const [screenerData, bsePresentations] = await Promise.all([
-    fetchScreenerData(),
+    process.env.ENABLE_SCREENER_SCRAPE === "true"
+      ? withDeadline(fetchScreenerData(), 7000, "Screener metrics refresh")
+      : Promise.resolve({}),
     fetchBsePresentations(),
   ]);
   peerData = peerData.map((peer) => {
@@ -2446,16 +2496,35 @@ function buildSourceStats(sources = []) {
   };
 }
 
+function skippedHtmlHealth() {
+  return HTML_SOURCES.map((source) => ({
+    source: source.source,
+    url: source.url,
+    defaultCategory: source.defaultCategory,
+    type: "HTML",
+    sourceTier: "direct",
+    status: "skipped",
+    itemCount: 0,
+    error: "Skipped on interactive refresh",
+  }));
+}
+
 async function buildIntelligencePayload() {
     const [rssNewsResult, htmlNewsResult, gdeltNewsResult, marketResult, globalResult, archivedItems, bseResult, nseResult] = await Promise.allSettled([
-      fetchRssNews(),
-      fetchHtmlSourceNews(),
-      fetchGdeltNews(),
-      fetchMarketData(),
-      fetchGlobalData(),
-      loadNewsArchive(),
-      fetchBseAnnouncements(),
-      fetchNseAnnouncements(),
+      withDeadline(fetchRssNews(), 18000, "RSS refresh"),
+      ENABLE_HEAVY_SOURCE_SCRAPE
+        ? withDeadline(fetchHtmlSourceNews(), 12000, "HTML source refresh")
+        : Promise.resolve({ items: [], health: skippedHtmlHealth() }),
+      withDeadline(fetchGdeltNews(), 8000, "GDELT refresh"),
+      withDeadline(fetchMarketData(), 10000, "Market data refresh"),
+      withDeadline(fetchGlobalData(), 8000, "Global data refresh"),
+      withDeadline(loadNewsArchive(), 2500, "News archive read"),
+      ENABLE_HEAVY_SOURCE_SCRAPE
+        ? withDeadline(fetchBseAnnouncements(), 10000, "BSE filings refresh")
+        : Promise.resolve([]),
+      ENABLE_HEAVY_SOURCE_SCRAPE
+        ? withDeadline(fetchNseAnnouncements(), 10000, "NSE filings refresh")
+        : Promise.resolve([]),
     ]);
 
     const rssItems = rssNewsResult.status === "fulfilled" ? rssNewsResult.value.items : [];
@@ -2511,17 +2580,21 @@ async function buildIntelligencePayload() {
         source: "BSE Filings",
         url: "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w",
         type: "API",
-        status: bseResult.status === "fulfilled" ? "ok" : "error",
+        status: ENABLE_HEAVY_SOURCE_SCRAPE ? (bseResult.status === "fulfilled" ? "ok" : "error") : "skipped",
         itemCount: bseResult.status === "fulfilled" ? bseResult.value.length : 0,
-        error: bseResult.status === "rejected" ? bseResult.reason?.message || "BSE filings failed" : null,
+        error: ENABLE_HEAVY_SOURCE_SCRAPE
+          ? (bseResult.status === "rejected" ? bseResult.reason?.message || "BSE filings failed" : null)
+          : "Skipped on interactive refresh",
       },
       {
         source: "NSE Filings",
         url: "https://www.nseindia.com/api/corporate-announcements",
         type: "API",
-        status: nseResult.status === "fulfilled" ? "ok" : "error",
+        status: ENABLE_HEAVY_SOURCE_SCRAPE ? (nseResult.status === "fulfilled" ? "ok" : "error") : "skipped",
         itemCount: nseResult.status === "fulfilled" ? nseResult.value.length : 0,
-        error: nseResult.status === "rejected" ? nseResult.reason?.message || "NSE filings failed" : null,
+        error: ENABLE_HEAVY_SOURCE_SCRAPE
+          ? (nseResult.status === "rejected" ? nseResult.reason?.message || "NSE filings failed" : null)
+          : "Skipped on interactive refresh",
       },
       {
         ...NEWS_APIS[0],

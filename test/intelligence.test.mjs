@@ -12,6 +12,7 @@ import {
   isFinancialServicesMaterial,
   normalizeUrl,
 } from "../app/api/intelligence/route.js";
+import { FILTER_OPTIONS } from "../data/appConfig.js";
 
 test("normalizeUrl removes tracking params and trailing slash", () => {
   const normalized = normalizeUrl("https://example.com/story/?utm_source=test&utm_medium=email#frag");
@@ -123,6 +124,7 @@ test("extractEntities avoids Bank of India false positive inside Reserve Bank of
 test("broking taxonomy captures new-age and traditional brokers", () => {
   assert.equal(classifySector("Groww Zerodha Upstox and Dhan report higher active traders", "Policy"), "Broking");
   assert.equal(classifySector("Kotak Securities and ICICI Securities update brokerage platforms", "Policy"), "Broking");
+  assert.equal(classifySector("Fyers Alice Blue Samco and Geojit update discount broking apps", "Policy"), "Broking");
   assert.equal(classifySegment("Groww and Zerodha broking update", "Policy"), "Others");
 
   const entities = extractEntities("Upstox, Zerodha, Groww and Kotak Securities launch new broking tools");
@@ -136,6 +138,29 @@ test("broking taxonomy captures new-age and traditional brokers", () => {
     title: "Groww Zerodha and Upstox report active user growth",
     description: "Indian stock broker and trading app update",
     defaultCategory: "Policy",
+  }), true);
+});
+
+test("kissht section captures corporate aliases and material news", () => {
+  assert.deepEqual(
+    FILTER_OPTIONS.slice(
+      FILTER_OPTIONS.indexOf("Digital Lenders"),
+      FILTER_OPTIONS.indexOf("Digital Lenders") + 2
+    ),
+    ["Digital Lenders", "Kissht"]
+  );
+  assert.equal(classifySector("Onemi Technologies-owned Kissht updates lending platform", "Policy"), "Kissht");
+  assert.equal(classifySector("Si Creva Capital Services rating action for digital lending business", "Credit Rating"), "Kissht");
+  assert.equal(classifySegment("Si-Creva and Onemi Technologies raise debt for Kissht", "Fundraise"), "Kissht");
+
+  const entities = extractEntities("Onemi Technologies and Si Creva operate Kissht in India");
+  assert.ok(entities.includes("Kissht"));
+
+  assert.equal(isFinancialServicesMaterial({
+    source: "Google News Kissht",
+    title: "Onemi Technologies-owned Kissht raises debt",
+    description: "Si Creva digital lending platform expands in India",
+    defaultCategory: "Fundraise",
   }), true);
 });
 

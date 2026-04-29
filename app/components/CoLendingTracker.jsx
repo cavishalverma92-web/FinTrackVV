@@ -24,6 +24,11 @@ export default function CoLendingTracker({ coLendingData = [] }) {
   // Calculate total volume (rough extraction from strings)
   const totalDeals = coLendingData.length;
   const activeDeals = coLendingData.filter((d) => d.status === "Active").length;
+  const sourceLinkFor = (deal) => deal.url || deal.sourceUrl || (
+    deal.bank && deal.nbfc
+      ? `https://news.google.com/search?q=${encodeURIComponent(`${deal.bank} ${deal.nbfc} co-lending India`)}`
+      : null
+  );
 
   return (
     <div className="animate-fade-in">
@@ -69,6 +74,7 @@ export default function CoLendingTracker({ coLendingData = [] }) {
       <div className="flex flex-col gap-3">
         {coLendingData.map((deal, index) => {
           const sStyle = statusStyle(deal.status);
+          const sourceLink = sourceLinkFor(deal);
 
           return (
             <div
@@ -120,14 +126,14 @@ export default function CoLendingTracker({ coLendingData = [] }) {
                   <MapPin size={10} />
                   <span className="text-[var(--text-secondary)]">{deal.geography}</span>
                 </div>
-                {deal.url && (
+                {sourceLink && (
                   <a
-                    href={deal.url}
+                    href={sourceLink}
                     target="_blank"
                     rel="noreferrer"
                     className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-blue)] hover:underline"
                   >
-                    Read <ExternalLink size={10} />
+                    {deal.url || deal.sourceUrl ? "Source" : "Search source"} <ExternalLink size={10} />
                   </a>
                 )}
               </div>

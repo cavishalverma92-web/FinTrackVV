@@ -124,6 +124,11 @@ const SEGMENT_KEYWORDS = {
     "getvantage", "recur club", "rupeek", "paysense", "finnable",
     "incred", "neobank", "neo-bank", "embedded lending",
   ],
+  Kissht: [
+    "kissht", "kissht app", "kissht loan",
+    "onemi", "onemi technologies", "onemi technology",
+    "si creva", "si-creva", "sicreva",
+  ],
   Banks: [
     "hdfc bank", "icici bank", "axis bank", "kotak bank",
     "kotak mahindra bank", "state bank of india", "sbi",
@@ -154,9 +159,10 @@ const SEGMENT_KEYWORDS = {
     "zerodha", "groww", "upstox", "dhanhq", "dhan app", "dhan broking", "dhann",
     "angel one", "angel broking", "nuvama", "kotak securities", "icici securities",
     "icici direct", "hdfc securities", "motilal oswal", "sharekhan", "5paisa",
-    "five paisa", "geojit", "samco", "alice blue", "iifl securities",
-    "axis securities", "sbi securities", "broking", "brokerage", "stock broker",
-    "stockbroker", "trading app", "demat",
+    "five paisa", "geojit", "samco", "alice blue", "fyers", "iifl securities",
+    "axis securities", "sbi securities", "bob capital", "bobcaps", "choice broking",
+    "jm financial services", "phillipcapital", "broking", "brokerage", "stock broker",
+    "stockbroker", "discount broker", "full-service broker", "trading app", "demat",
   ],
 };
 
@@ -177,7 +183,7 @@ function itemMatchesSegment(item, segment) {
   const text = itemText(item);
 
   if (segment === "Others") {
-    return !["NBFCs", "Digital Lenders", "Banks", "AI & Tech", "Exchange Filings"].some((group) => itemMatchesSegment(item, group));
+    return !["NBFCs", "Digital Lenders", "Kissht", "Banks", "AI & Tech", "Exchange Filings"].some((group) => itemMatchesSegment(item, group));
   }
 
   return (SEGMENT_KEYWORDS[segment] || []).some((keyword) => text.includes(keyword));

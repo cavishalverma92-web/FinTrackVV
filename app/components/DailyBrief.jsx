@@ -43,6 +43,7 @@ function getSegmentCounts(newsItems) {
 const SEGMENT_COLORS = {
   NBFCs: "var(--accent-amber)",
   "Digital Lenders": "var(--accent-blue)",
+  Kissht: "var(--accent-blue)",
   Banks: "var(--accent-green)",
   "AI & Tech": "#8B6FBF",
   HFCs: "var(--accent-amber)",

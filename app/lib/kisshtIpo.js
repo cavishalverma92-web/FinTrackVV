@@ -56,11 +56,20 @@ const IPO_TERMS = [
   "anchor investor",
 ];
 
+const KISSHT_NEWS_TERMS = [
+  "stock", "share", "share price", "volume", "market cap", "listing", "listed",
+  "quarterly", "earnings", "results", "revenue", "profit", "aum", "asset quality",
+  "credit cost", "rating", "rbi", "sebi", "funding", "product", "loan", "lending",
+  "secured lending", "digital loan", "investor", "analyst", "management",
+];
+
 const NEWS_SOURCES = [
-  { name: "Google News - Kissht Real Time", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology" OR "OnEMI Technologies" OR "SI Creva" OR SiCreva) (stock OR share OR listing OR price OR volume OR results OR RBI OR rating OR fintech OR lending) when:7d' },
+  { name: "Google News - Kissht Real Time", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology" OR "OnEMI Technologies" OR "OnEMI Technology Solutions" OR "SI Creva" OR SiCreva) (stock OR share OR listing OR price OR volume OR results OR RBI OR rating OR fintech OR lending OR AUM OR profit OR revenue) when:14d' },
   { name: "Google News - Kissht Entity", reliability: 2, type: "aggregator", query: 'Kissht OR "OnEMI Technologies" OR "SI Creva" OR SiCreva when:30d' },
   { name: "Google News - OnEMI Market", reliability: 2, type: "aggregator", query: '"OnEMI Technology Solutions" (share price OR stock OR BSE OR NSE OR results OR investors) when:30d' },
   { name: "Google News - Kissht IR", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology Solutions") (investor relations OR earnings OR results OR AUM OR profitability OR presentation) when:45d' },
+  { name: "Google News - Kissht Credit", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology Solutions" OR "Si Creva") (rating OR CRISIL OR ICRA OR CARE OR "asset quality" OR "credit cost" OR NPA) when:60d' },
+  { name: "Google News - Kissht Product", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology Solutions") ("secured lending" OR "digital loan" OR "personal loan" OR MSME OR "loan against property" OR product) when:60d' },
   { name: "Economic Times", reliability: 2, type: "news", query: 'site:economictimes.indiatimes.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR RBI OR IPO) when:30d' },
   { name: "ET BFSI", reliability: 2, type: "news", query: 'site:bfsi.economictimes.indiatimes.com (Kissht OR "OnEMI Technologies" OR "SI Creva") when:30d' },
   { name: "LiveMint", reliability: 2, type: "news", query: 'site:livemint.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
@@ -194,6 +203,8 @@ const TOPIC_RULES = [
   ["Broker note", ["broker note", "subscribe", "avoid", "recommendation", "analyst note", "ipo review"]],
   ["Stock price / volume", ["share price", "stock", "volume", "bse", "nse", "market cap", "listed", "listing"]],
   ["IR / results", ["investor relations", "earnings", "quarterly", "results", "presentation", "aum"]],
+  ["Business momentum", ["revenue", "profit", "active customer", "customer base", "disbursement", "loan book", "growth"]],
+  ["Product / distribution", ["secured lending", "digital loan", "personal loan", "msme", "loan against property", "partnership"]],
   ["Financial performance", ["revenue", "profit", "loss", "aum", "net worth", "financials"]],
   ["Asset quality / credit risk", ["npa", "gnpa", "nnpa", "credit cost", "asset quality", "delinquencies"]],
   ["Regulation / RBI", ["rbi", "sebi", "regulatory", "digital lending guidelines", "fldg"]],
@@ -401,6 +412,7 @@ function relevanceScore(item) {
   let score = 55;
   if (getMatchedEntity(title)) score += 20;
   if (IPO_TERMS.some((term) => body.includes(term))) score += 15;
+  if (KISSHT_NEWS_TERMS.some((term) => body.includes(term))) score += 15;
   if (["kissht ipo", "onemi technologies ipo", "si creva capital ipo"].some((term) => body.includes(term))) score += 10;
   return Math.min(100, score);
 }
@@ -596,7 +608,7 @@ async function fetchNewsSources() {
     ...rssResults.flatMap((result) => result.status === "fulfilled" ? result.value.items : []),
     ...directResults.flatMap((result) => result.status === "fulfilled" ? result.value.items : []),
   ];
-  const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
   const recent = rawItems.filter((item) => !item.publishedAt || new Date(item.publishedAt).getTime() >= cutoff);
   return { news: dedupeKisshtNews(recent), statuses: [...rssStatuses, ...directStatuses] };
 }

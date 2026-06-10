@@ -325,8 +325,8 @@ const RSS_FEEDS = [
     defaultCategory: "Policy",
   },
   {
-    source: "Google News Housing Finance",
-    url: "https://news.google.com/rss/search?q=%28%22housing%20finance%22%20OR%20HFC%20OR%20%22home%20loan%22%20OR%20%22National%20Housing%20Bank%22%20OR%20NHB%20OR%20%22affordable%20housing%22%29%20India%20NBFC%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
+    source: "Google News Mutual Fund Distribution",
+    url: "https://news.google.com/rss/search?q=%28%22mutual%20fund%20distributor%22%20OR%20%22mutual%20fund%20distribution%22%20OR%20MFD%20OR%20AMFI%20OR%20ARN%20OR%20Prudent%20OR%20%22NJ%20Wealth%22%20OR%20%22NJ%20IndiaInvest%22%20OR%20Wealthy%20OR%20AssetPlus%20OR%20Fintso%20OR%20FundsIndia%20OR%20%22Bajaj%20Capital%22%20OR%20Scripbox%20OR%20Kuvera%20OR%20%22ET%20Money%22%20OR%20INDmoney%20OR%20Dezerv%20OR%20WealthDesk%20OR%20%22trail%20commission%22%20OR%20%22regular%20plan%22%20OR%20%22direct%20plan%22%20OR%20%22MF%20Central%22%20OR%20%22MF%20Utility%22%20OR%20CAMS%20OR%20KFintech%29%20India%20when%3A30d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Policy",
   },
   {
@@ -345,8 +345,8 @@ const RSS_FEEDS = [
     defaultCategory: "Policy",
   },
   {
-    source: "Google News NHB",
-    url: "https://news.google.com/rss/search?q=%28NHB%20OR%20%22National%20Housing%20Bank%22%29%20%28circular%20OR%20lending%20OR%20housing%20finance%20OR%20regulation%20OR%20HFC%29%20when%3A60d&hl=en-IN&gl=IN&ceid=IN:en",
+    source: "Google News AMFI SEBI Distribution",
+    url: "https://news.google.com/rss/search?q=%28SEBI%20OR%20AMFI%20OR%20%22Association%20of%20Mutual%20Funds%20in%20India%22%29%20%28%22mutual%20fund%20distributor%22%20OR%20distributor%20OR%20MFD%20OR%20ARN%20OR%20Prudent%20OR%20%22NJ%20Wealth%22%20OR%20AssetPlus%20OR%20Fintso%20OR%20FundsIndia%20OR%20commission%20OR%20%22direct%20plan%22%20OR%20%22regular%20plan%22%29%20India%20when%3A60d&hl=en-IN&gl=IN&ceid=IN:en",
     defaultCategory: "Regulation",
   },
   // ── Digital Lenders ──
@@ -461,7 +461,7 @@ const BSE_BFSI_CODES = {
   "543259": "Home First Finance", "535322": "Repco Home Finance",
   "532720": "Mahindra Finance", "590071": "Sundaram Finance",
   "544002": "Muthoot Microfin",
-  // HFCs
+  // Housing-finance companies retained for exchange filing coverage.
   "500253": "LIC Housing Finance", "540173": "PNB Housing Finance",
   "511196": "Can Fin Homes", "535789": "Indiabulls Housing Finance",
   // MFIs & Small Finance Banks
@@ -816,7 +816,12 @@ const RELEVANCE_WORDS = [
   // Core FS
   "nbfc", "lending", "loan", "credit", "bank", "finance", "fintech", "rbi", "sebi",
   "ncd", "msme", "co-lending", "rating", "debt", "bond", "asset quality", "npa",
-  "mfi", "microfinance", "hfc", "housing finance", "sidbi", "nhb", "pib",
+  "mfi", "microfinance", "sidbi", "pib",
+  "mutual fund distributor", "mutual fund distribution", "mfd", "amfi", "arn",
+  "regular plan", "direct plan", "trail commission", "mf utility", "mf central",
+  "prudent corporate", "prudent broking", "prudent", "nj wealth", "nj india", "nj indiainvest",
+  "wealthy", "assetplus", "asset plus", "fintso", "fundsindia", "bajaj capital",
+  "scripbox", "kuvera", "et money", "indmoney", "dezerv", "wealthdesk",
   // Digital lenders
   "digital lender", "kreditbee", "moneyview", "kissht", "onemi", "onemi technologies",
   "onemi technology", "si creva", "si-creva", "sicreva", "navi", "fibe", "stashfin",
@@ -859,12 +864,16 @@ const RATING_AGENCY_TERMS = [
 
 const BFSI_ENTITY_TERMS = [
   "nbfc", "non banking", "non-banking", "bank", "small finance bank", "co-operative bank",
-  "cooperative bank", "housing finance", "hfc", "microfinance", "mfi", "gold loan",
+  "cooperative bank", "microfinance", "mfi", "gold loan",
   "vehicle finance", "msme lending", "consumer lending", "personal loan", "credit card",
   "digital lending", "digital lender", "fintech lender", "payments bank", "payment aggregator",
   "payment gateway", "upi", "wealthtech", "broking", "brokerage", "stock broker", "stockbroker",
   "trading app", "discount broker", "full-service broker", "demat", "insurance", "asset management",
-  "amc", "mutual fund", "lending service provider", "lsp", "dlg", "co-lending", "co lending",
+  "amc", "mutual fund", "mutual fund distributor", "mutual fund distribution", "mfd",
+  "amfi", "arn", "trail commission", "lending service provider", "lsp", "dlg", "co-lending", "co lending",
+  "prudent corporate", "prudent broking", "nj wealth", "nj india", "nj indiainvest",
+  "wealthy", "assetplus", "asset plus", "fintso", "fundsindia", "bajaj capital",
+  "scripbox", "kuvera", "et money", "indmoney", "dezerv", "wealthdesk",
   "kissht", "onemi", "onemi technologies", "onemi technology", "si creva", "si-creva", "sicreva",
   "loan book", "aum", "gnpa", "nnpa", "capital adequacy", "provisioning", "collection efficiency",
   "disbursement", "asset quality", "cost of funds", "credit cost",
@@ -967,11 +976,11 @@ const SOURCE_WEIGHTS = {
   "Google News Medianama Fintech": 18,
   "Google News MFI": 18,
   "Google News MSME Lending": 18,
-  "Google News Housing Finance": 18,
+  "Google News Mutual Fund Distribution": 20,
   "Google News NCD Bond": 20,
   VCCircle: 16,
   "Google News SIDBI": 22,
-  "Google News NHB": 24,
+  "Google News AMFI SEBI Distribution": 24,
   "Google News Digital Lenders": 20,
   "Google News Fintech Platforms": 20,
   "Google News BNPL": 18,
@@ -1120,7 +1129,16 @@ export function classifySector(text, category) {
 
   if (["gold loan", "muthoot", "manappuram", "rupeek"].some((word) => lower.includes(word))) return "Gold Loans";
   if (["vehicle finance", "commercial vehicle", "cv finance", "mahindra finance", "shriram finance"].some((word) => lower.includes(word))) return "Vehicle Finance";
-  if (["housing finance", "home loan", "hfc ", " hfc", "aavas", "aptus", "home first", "can fin", "lic housing", "pnb housing"].some((word) => lower.includes(word))) return "HFCs";
+  if ([
+    "mutual fund distributor", "mutual fund distribution", " mfd ", "mfds",
+    "amfi", " arn ", "arn holder", "trail commission", "distributor commission",
+    "regular plan", "direct plan", "mf utility", "mf central", "cams", "kfintech",
+    "nism", "wealth distributor", "investment adviser", "ria ", " ifa ",
+    "prudent corporate", "prudent broking", "prudent mutual fund", "nj wealth",
+    "nj india", "nj indiainvest", "nj mutual fund", "wealthy", "assetplus",
+    "asset plus", "fintso", "fundsindia", "funds india", "bajaj capital",
+    "scripbox", "kuvera", "et money", "indmoney", "dezerv", "wealthdesk",
+  ].some((word) => ` ${lower} `.includes(word))) return "Mutual Fund Distribution";
   if (["microfinance", "nbfc-mfi", "mfi ", " mfi", "creditaccess", "spandana", "fusion finance", "muthoot microfin", "arohan"].some((word) => lower.includes(word))) return "MFIs";
   if (["kissht", "onemi", "onemi technologies", "onemi technology", "si creva", "si-creva", "sicreva"].some((word) => lower.includes(word))) return "Kissht";
 
@@ -1166,12 +1184,10 @@ export function classifySector(text, category) {
     "bajaj finance", "shriram finance", "muthoot", "manappuram",
     "iifl", "poonawalla", "tata capital", "l&t finance",
     "cholamandalam", "mahindra finance", "sundaram finance",
-    "can fin", "aavas", "five star", "five-star",
+    "five star", "five-star",
     "creditaccess", "credit access", "fusion finance",
     "mas financial", "aptus", "repco", "home first",
-    "aadhar housing", "india shelter",
     "microfinance", "nbfc-mfi", "mfi ", " mfi",
-    "housing finance", "hfc ", " hfc",
     "msme lending", "sme finance", "sidbi",
     "arohan", "spandana", "asirvad", "bandhan",
     "ncd issuance", "non convertible debenture", "debenture",
@@ -1205,7 +1221,7 @@ export function classifySector(text, category) {
 
 export function classifySegment(text, category) {
   const sector = classifySector(text, category);
-  if (["HFCs", "MFIs", "Gold Loans"].includes(sector)) return "NBFCs";
+  if (["MFIs", "Gold Loans"].includes(sector)) return "NBFCs";
   if (sector === "Fintech Infra") return "AI & Tech";
   if (["Vehicle Finance", "Payments", "Broking", "Insurance", "Asset Management"].includes(sector)) return "Others";
   return sector;

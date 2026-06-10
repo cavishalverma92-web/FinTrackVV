@@ -37,7 +37,7 @@ const EMPTY_FILTERS = {
   sentiment: "All",
   risk: "All",
   topic: "All",
-  timeRange: "48h",
+  timeRange: "30d",
   entity: "All",
   sortBy: "Most Recent",
 };
@@ -125,10 +125,38 @@ function riskTone(value) {
 }
 
 function withinRange(item, range) {
-  if (range === "48h") return true;
+  if (range === "All") return true;
   if (!item.publishedAt) return true;
-  const hours = { "1h": 1, "6h": 6, "24h": 24 }[range] || 48;
+  const hours = { "1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720 }[range] || 720;
   return Date.now() - new Date(item.publishedAt).getTime() <= hours * 60 * 60 * 1000;
+}
+
+function newsRole(item) {
+  const text = `${item.title || ""} ${item.summary || ""} ${(item.categoryTags || []).join(" ")}`.toLowerCase();
+  if (/(rbi|sebi|regulat|rating|npa|asset quality|credit cost|governance|complaint|litigation|penalty)/i.test(text)) return "IR";
+  if (/(aum|revenue|profit|growth|secured lending|product|partnership|msme|loan book|disbursement)/i.test(text)) return "Strategy";
+  return "CEO";
+}
+
+function newsLens(news = []) {
+  const sorted = [...news].sort((a, b) => (b.materialityScore || 0) - (a.materialityScore || 0));
+  return [
+    {
+      title: "IR Watch",
+      subtitle: "Regulatory, rating and adverse narrative items",
+      items: sorted.filter((item) => newsRole(item) === "IR").slice(0, 3),
+    },
+    {
+      title: "Strategy Signals",
+      subtitle: "Growth, product, AUM and distribution developments",
+      items: sorted.filter((item) => newsRole(item) === "Strategy").slice(0, 3),
+    },
+    {
+      title: "CEO Briefing",
+      subtitle: "Highest-materiality headlines for leadership",
+      items: sorted.slice(0, 3),
+    },
+  ];
 }
 
 export default function KisshtIpoCommandCenter({ initialSnapshot }) {
@@ -181,6 +209,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
     negative: news.filter((item) => item.sentiment === "Negative").length,
   };
   const topics = [...new Set(news.flatMap((item) => item.categoryTags || []))];
+  const newsLenses = newsLens(news);
   const workingSources = sourceStatus.filter((source) => source.status === "Working").length;
   const sourceProblems = sourceStatus.filter((source) => ["Failed", "Manual/API required"].includes(source.status));
   const notifications = [
@@ -337,15 +366,17 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
+            <NewsLensSection lenses={newsLenses} />
+
             <Section
-              title="Live News Timeline"
-              subtitle="High-confidence Kissht / OnEMI / SI Creva public coverage for IR, strategy and leadership monitoring."
+              title="Kissht News Timeline"
+              subtitle="Post-listing Kissht / OnEMI / SI Creva coverage across market, operating, regulatory and investor themes."
               action={<Badge tone="blue">{filteredNews.length} visible</Badge>}
             >
               <div className="mb-4 flex flex-wrap gap-2">
                 <Select label="Sentiment" value={filters.sentiment} options={["All", "Positive", "Neutral", "Negative"]} onChange={(value) => setFilters((f) => ({ ...f, sentiment: value }))} />
                 <Select label="Risk" value={filters.risk} options={["All", "High", "Medium", "Low"]} onChange={(value) => setFilters((f) => ({ ...f, risk: value }))} />
-                <Select label="Time" value={filters.timeRange} options={["1h", "6h", "24h", "48h"]} onChange={(value) => setFilters((f) => ({ ...f, timeRange: value }))} />
+                <Select label="Time" value={filters.timeRange} options={["1h", "6h", "24h", "7d", "30d", "All"]} onChange={(value) => setFilters((f) => ({ ...f, timeRange: value }))} />
                 <Select label="Topic" value={filters.topic} options={["All", ...topics]} onChange={(value) => setFilters((f) => ({ ...f, topic: value }))} />
                 <Select label="Sort" value={filters.sortBy} options={["Most Recent", "Materiality", "Highest Risk", "Oldest"]} onChange={(value) => setFilters((f) => ({ ...f, sortBy: value }))} />
                 <button onClick={() => setFilters(EMPTY_FILTERS)} className="inline-flex items-center gap-1 rounded-sm border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-dim)]">
@@ -596,6 +627,39 @@ function MarketPulsePanel({ stockMarket, ipoTimeline }) {
         <StockMarketChart stockMarket={stockMarket} />
       </div>
     </section>
+  );
+}
+
+function NewsLensSection({ lenses = [] }) {
+  return (
+    <Section
+      title="Newsroom Lens"
+      subtitle="Role-based view of the same sourced Kissht news stream."
+      action={<Badge tone="blue">IR / Strategy / CEO</Badge>}
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        {lenses.map((lens) => (
+          <div key={lens.title} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+            <div className="mb-3">
+              <p className="text-sm font-bold">{lens.title}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-dim)]">{lens.subtitle}</p>
+            </div>
+            <div className="space-y-2">
+              {lens.items?.length ? lens.items.map((item) => (
+                <a key={`${lens.title}-${item.id}`} href={item.url} target="_blank" rel="noreferrer" className="block rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-card)] p-2 hover:bg-[var(--bg-card-hover)]">
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                    <Badge tone={sentimentTone(item.sentiment)}>{item.sentiment}</Badge>
+                    <span className="text-[10px] text-[var(--text-dim)] font-mono">{ageLabel(item.publishedAt)}</span>
+                  </div>
+                  <p className="line-clamp-2 text-xs font-semibold leading-snug">{item.title}</p>
+                  <p className="mt-1 text-[10px] text-[var(--text-dim)]">M{item.materialityScore} / {item.sourceName}</p>
+                </a>
+              )) : <EmptyState>No matching stories in current source window.</EmptyState>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 

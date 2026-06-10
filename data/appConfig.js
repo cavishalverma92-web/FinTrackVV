@@ -5,7 +5,7 @@ export const FILTER_OPTIONS = [
   "Digital Lenders",
   "Banks",
   "AI & Tech",
-  "HFCs",
+  "Mutual Fund Distribution",
   "MFIs",
   "Gold Loans",
   "Broking",

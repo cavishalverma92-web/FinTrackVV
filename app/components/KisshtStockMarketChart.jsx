@@ -55,6 +55,13 @@ export default function KisshtStockMarketChart({ stockMarket }) {
     ...point,
     label: new Date(point.timestamp || point.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
   }));
+  const latest = stockMarket?.current || points.at(-1) || null;
+  const closes = points.map((point) => Number(point.close)).filter(Number.isFinite);
+  const volumes = points.map((point) => Number(point.volume)).filter(Number.isFinite);
+  const periodHigh = closes.length ? Math.max(...closes) : null;
+  const periodLow = closes.length ? Math.min(...closes) : null;
+  const avgVolume = volumes.length ? volumes.reduce((sum, value) => sum + value, 0) / volumes.length : null;
+  const moveTone = latest?.changePercent > 0 ? "var(--accent-green)" : latest?.changePercent < 0 ? "var(--accent-red)" : "var(--text-dim)";
   return (
     <Section
       title="Daily Stock Price & Volume"
@@ -62,32 +69,65 @@ export default function KisshtStockMarketChart({ stockMarket }) {
       action={<BarChart3 size={16} className="text-[var(--text-dim)]" />}
     >
       {points.length ? (
-        <div className="h-[320px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: "var(--text-dim)", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="price" tick={{ fill: "var(--text-dim)", fontSize: 11 }} axisLine={false} tickLine={false} domain={["dataMin", "dataMax"]} width={46} />
-              <YAxis yAxisId="volume" orientation="right" tickFormatter={compactNumber} tick={{ fill: "var(--text-dim)", fontSize: 11 }} axisLine={false} tickLine={false} width={52} />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 6,
-                  color: "var(--text-primary)",
-                  fontSize: 12,
-                }}
-                formatter={(value, name) => {
-                  if (name === "close") return [money(value), "Close"];
-                  if (name === "volume") return [compactNumber(value), "Volume"];
-                  return [value, name];
-                }}
-                labelStyle={{ color: "var(--text-dim)" }}
-              />
-              <Bar yAxisId="volume" dataKey="volume" fill="var(--accent-blue)" opacity={0.22} radius={[3, 3, 0, 0]} />
-              <Line yAxisId="price" type="monotone" dataKey="close" stroke="var(--accent-burgundy)" strokeWidth={2.4} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
+        <div>
+          <div className="mb-4 grid gap-2 md:grid-cols-4">
+            <div className="rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--text-dim)] font-mono">Latest close</p>
+              <p className="mt-1 font-display text-xl font-bold">{money(latest?.close)}</p>
+              <p className="mt-1 text-[11px] font-bold" style={{ color: moveTone }}>
+                {latest?.changePercent == null ? "Move awaited" : `${latest.changePercent > 0 ? "+" : ""}${latest.changePercent}% day`}
+              </p>
+            </div>
+            <div className="rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--text-dim)] font-mono">Latest volume</p>
+              <p className="mt-1 font-display text-xl font-bold">{latest?.volumeLabel || compactNumber(latest?.volume)}</p>
+              <p className="mt-1 text-[11px] text-[var(--text-dim)]">Avg {compactNumber(avgVolume)}</p>
+            </div>
+            <div className="rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--text-dim)] font-mono">Period range</p>
+              <p className="mt-1 font-display text-xl font-bold">{money(periodLow)} - {money(periodHigh)}</p>
+              <p className="mt-1 text-[11px] text-[var(--text-dim)]">{points.length} daily candles</p>
+            </div>
+            <div className="rounded-sm border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--text-dim)] font-mono">Updated</p>
+              <p className="mt-1 font-display text-xl font-bold">{latest?.label || "Awaited"}</p>
+              <p className="mt-1 text-[11px] text-[var(--text-dim)]">{stockMarket?.source || "Market source"}</p>
+            </div>
+          </div>
+          <div className="h-[360px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={points} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="kisshtVolume" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="var(--accent-blue)" stopOpacity={0.34} />
+                    <stop offset="100%" stopColor="var(--accent-blue)" stopOpacity={0.08} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: "var(--text-dim)", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={18} />
+                <YAxis yAxisId="price" tick={{ fill: "var(--text-dim)", fontSize: 11 }} axisLine={false} tickLine={false} domain={["dataMin - 2", "dataMax + 2"]} width={54} tickFormatter={(value) => `Rs ${value}`} />
+                <YAxis yAxisId="volume" orientation="right" tickFormatter={compactNumber} tick={{ fill: "var(--text-dim)", fontSize: 11 }} axisLine={false} tickLine={false} width={58} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 6,
+                    color: "var(--text-primary)",
+                    fontSize: 12,
+                    boxShadow: "0 12px 28px var(--shadow-soft)",
+                  }}
+                  formatter={(value, name) => {
+                    if (name === "close") return [money(value), "Close"];
+                    if (name === "volume") return [compactNumber(value), "Volume"];
+                    return [value, name];
+                  }}
+                  labelStyle={{ color: "var(--text-dim)" }}
+                />
+                <Bar yAxisId="volume" dataKey="volume" fill="url(#kisshtVolume)" radius={[3, 3, 0, 0]} />
+                <Line yAxisId="price" type="monotone" dataKey="close" stroke="var(--accent-burgundy)" strokeWidth={2.8} dot={false} activeDot={{ r: 5, strokeWidth: 2 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       ) : (
         <EmptyState>{stockMarket?.message || "No daily stock-price data available from configured symbols yet."}</EmptyState>

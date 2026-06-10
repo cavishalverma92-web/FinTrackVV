@@ -46,7 +46,7 @@ const SEGMENT_COLORS = {
   Kissht: "var(--accent-blue)",
   Banks: "var(--accent-green)",
   "AI & Tech": "#8B6FBF",
-  HFCs: "var(--accent-amber)",
+  "Mutual Fund Distribution": "var(--accent-green)",
   MFIs: "var(--accent-red)",
   "Gold Loans": "#B7791F",
   Broking: "var(--accent-green)",

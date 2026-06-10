@@ -141,6 +141,23 @@ test("broking taxonomy captures new-age and traditional brokers", () => {
   }), true);
 });
 
+test("mutual fund distribution replaces hfc segment", () => {
+  assert.ok(FILTER_OPTIONS.includes("Mutual Fund Distribution"));
+  assert.ok(!FILTER_OPTIONS.includes("HFCs"));
+  assert.equal(classifySector("AMFI updates mutual fund distributor ARN and trail commission norms", "Regulation"), "Mutual Fund Distribution");
+  assert.equal(classifySegment("Mutual fund distributors see regular plan inflows through B30 channels", "Policy"), "Mutual Fund Distribution");
+  assert.equal(classifySector("Prudent Corporate and NJ Wealth report mutual fund distributor growth", "Earnings"), "Mutual Fund Distribution");
+  assert.equal(classifySector("AssetPlus, Fintso, Wealthy and FundsIndia expand MFD platform tools", "Product / Tech"), "Mutual Fund Distribution");
+  assert.equal(classifySector("Scripbox Kuvera ET Money and INDmoney update mutual fund distribution offerings", "Policy"), "Mutual Fund Distribution");
+
+  assert.equal(isFinancialServicesMaterial({
+    source: "Google News Mutual Fund Distribution",
+    title: "AMFI updates mutual fund distributor commission disclosure norms",
+    description: "ARN holders and MFDs prepare for regular plan trail commission changes",
+    defaultCategory: "Regulation",
+  }), true);
+});
+
 test("kissht section captures corporate aliases and material news", () => {
   assert.ok(!FILTER_OPTIONS.includes("Kissht"));
   assert.equal(classifySector("Onemi Technologies-owned Kissht updates lending platform", "Policy"), "Kissht");

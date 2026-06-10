@@ -5,64 +5,31 @@ import {
   classifyKisshtRisk,
   classifyKisshtSentiment,
   dedupeKisshtNews,
-  extractGmpPoint,
   getMatchedEntity,
 } from "../app/lib/kisshtIpo.js";
 
-test("kissht ipo relevance detects entity aliases", () => {
-  assert.equal(getMatchedEntity("OnEMI Technologies IPO price band update"), "onemi technologies");
-  assert.equal(getMatchedEntity("SI Creva Capital files IPO papers"), "si creva capital");
-  assert.equal(getMatchedEntity("Generic fintech IPO opens"), null);
+test("kissht relevance detects entity aliases", () => {
+  assert.equal(getMatchedEntity("OnEMI Technologies quarterly results update"), "onemi technologies");
+  assert.equal(getMatchedEntity("SI Creva Capital stock exchange filing"), "si creva capital");
+  assert.equal(getMatchedEntity("Generic fintech funding update"), null);
 });
 
-test("kissht risk classifier flags adverse IPO wording", () => {
-  const risk = classifyKisshtRisk("Kissht IPO review says avoid due to RBI concern and asset quality risk");
+test("kissht risk classifier flags adverse public-market wording", () => {
+  const risk = classifyKisshtRisk("Kissht analyst note says avoid due to RBI concern and asset quality risk");
   assert.equal(risk.level, "High");
   assert.ok(risk.keywords.includes("avoid"));
 });
 
 test("kissht risk classifier does not overflag generic regulatory mentions", () => {
-  const risk = classifyKisshtRisk("OnEMI Technology IPO price band announced; proceeds go to RBI regulated NBFC subsidiary");
+  const risk = classifyKisshtRisk("OnEMI Technology investor update references its RBI regulated NBFC subsidiary");
   assert.equal(risk.level, "Low");
   assert.deepEqual(risk.keywords, []);
 });
 
 test("kissht sentiment classifier is deterministic", () => {
-  assert.equal(classifyKisshtSentiment("Kissht IPO gets subscribe recommendation and strong subscription"), "Positive");
-  assert.equal(classifyKisshtSentiment("Kissht IPO avoid recommendation after weak subscription"), "Negative");
-  assert.equal(classifyKisshtSentiment("Kissht IPO price band announced"), "Neutral");
-});
-
-test("gmp percentage calculation uses upper price band", () => {
-  const point = extractGmpPoint("Kissht IPO GMP Rs 24, issue price Rs 120", "Test", "https://example.com");
-  assert.equal(point.gmp, 24);
-  assert.equal(point.priceBand, 120);
-  assert.equal(point.gmpPercent, 20);
-  assert.equal(point.estimatedListingPrice, 144);
-});
-
-test("gmp parser handles IPO portal price band copy", () => {
-  const point = extractGmpPoint("OnEMI Technology Solutions (Kissht) IPO GMP Price (₹) 171 GMP 7 projected listing price ₹178", "LamfIndia", "https://example.com");
-  assert.equal(point.gmp, 7);
-  assert.equal(point.priceBand, 171);
-  assert.equal(point.gmpPercent, 4.09);
-  assert.equal(point.estimatedListingPrice, 178);
-});
-
-test("gmp parser handles number before live gmp label", () => {
-  const point = extractGmpPoint("Price Band ₹162.00-171.00 per share ₹5 Live GMP ₹176 Est. Listing", "InvestorGain GMP", "https://example.com");
-  assert.equal(point.gmp, 5);
-  assert.equal(point.priceBand, 171);
-  assert.equal(point.gmpPercent, 2.92);
-  assert.equal(point.estimatedListingPrice, 176);
-});
-
-test("gmp parser handles premium wording from news copy", () => {
-  const point = extractGmpPoint("OnEMI Technology IPO GMP: shares trading at a Rs 4 premium over the upper price band of Rs 171", "Economic Times", "https://example.com");
-  assert.equal(point.gmp, 4);
-  assert.equal(point.priceBand, 171);
-  assert.equal(point.gmpPercent, 2.34);
-  assert.equal(point.estimatedListingPrice, 175);
+  assert.equal(classifyKisshtSentiment("Kissht reports healthy growth and profitability improvement"), "Positive");
+  assert.equal(classifyKisshtSentiment("Kissht gets avoid recommendation after asset quality concern"), "Negative");
+  assert.equal(classifyKisshtSentiment("Kissht investor presentation announced"), "Neutral");
 });
 
 test("kissht dedupe groups similar source variants", () => {
@@ -79,14 +46,14 @@ test("kissht dedupe groups similar source variants", () => {
     riskKeywords: [],
     materialityScore: 82,
     relevanceScore: 90,
-    categoryTags: ["IPO launch / price band"],
+    categoryTags: ["IR / results"],
     duplicateGroupId: "group",
-    summary: "Kissht IPO price band update",
+    summary: "Kissht quarterly results update",
     whyThisMatters: "",
   };
   const items = dedupeKisshtNews([
-    { ...base, id: "1", title: "Kissht IPO price band announced", headline: "Kissht IPO price band announced", snippet: "Kissht IPO", url: "https://a.example/story" },
-    { ...base, id: "2", title: "Kissht IPO price band announced today", headline: "Kissht IPO price band announced today", snippet: "Kissht IPO", url: "https://b.example/story" },
+    { ...base, id: "1", title: "Kissht quarterly results announced", headline: "Kissht quarterly results announced", snippet: "Kissht results", url: "https://a.example/story" },
+    { ...base, id: "2", title: "Kissht quarterly results announced today", headline: "Kissht quarterly results announced today", snippet: "Kissht results", url: "https://b.example/story" },
   ]);
   assert.equal(items.length, 1);
   assert.equal(items[0].relatedUrls.length, 2);

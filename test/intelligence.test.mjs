@@ -70,6 +70,36 @@ test("dedupeAndRankNews merges source variants of the same story", () => {
   assert.equal(deduped[0].sourceCount, 2);
 });
 
+test("overall portal preserves relevant non-RBI sections in a regulator-heavy feed", () => {
+  const regulatorItems = Array.from({ length: 80 }, (_, index) => ({
+    id: `rbi-${index}`,
+    headline: `RBI digital lending supervision update ${index}`,
+    tldr: `Regulator update for lending compliance ${index}`,
+    source: "RBI",
+    category: "Regulation",
+    risk: "Medium",
+    url: `https://rbi.org.in/story-${index}`,
+    publishedAt: "2026-06-10T10:00:00Z",
+    tags: ["Regulation"],
+  }));
+  const mfdItem = {
+    id: "mfd-1",
+    headline: "Prudent and NJ Wealth report mutual fund distributor growth",
+    tldr: "MFD platforms expand ARN and regular plan distribution reach.",
+    source: "Google News Mutual Fund Distribution",
+    category: "Policy",
+    risk: "Low",
+    url: "https://example.com/mfd-growth",
+    publishedAt: "2026-06-10T09:30:00Z",
+    tags: ["Mutual Fund Distribution"],
+  };
+
+  const ranked = dedupeAndRankNews([...regulatorItems, mfdItem]);
+
+  assert.ok(ranked.some((item) => item.id === "mfd-1"));
+  assert.ok(ranked.filter((item) => item.category === "Regulation").length <= 12);
+});
+
 test("materiality gate blocks generic market and government securities noise", () => {
   assert.equal(isFinancialServicesMaterial({
     source: "RBI",

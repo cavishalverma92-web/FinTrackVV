@@ -1961,17 +1961,60 @@ function sourceCapFor(item) {
   return 12;
 }
 
+function sectionKeyForNews(item = {}) {
+  if (item.sourceType === "exchange_filing") return "Exchange Filings";
+  if (item.sector && item.sector !== "Others") return item.sector;
+  if (item.segment && item.segment !== "Others") return item.segment;
+  if (["Ratings / Credit", "Credit Rating"].includes(item.category)) return "Ratings / Credit";
+  if (["Regulation", "Penalty"].includes(item.category)) return "Regulation";
+  return "Others";
+}
+
 function diversifyRankedNews(items, limit = 60) {
   const selected = [];
   const overflow = [];
-  const counts = new Map();
+  const sourceCounts = new Map();
+  const sectionCounts = new Map();
+  const selectedIds = new Set();
+  const prioritySections = [
+    "Exchange Filings",
+    "NBFCs",
+    "Digital Lenders",
+    "Kissht",
+    "Banks",
+    "Mutual Fund Distribution",
+    "Broking",
+    "MFIs",
+    "Gold Loans",
+    "Fintech Infra",
+    "Ratings / Credit",
+  ];
+
+  const add = (item) => {
+    if (!item || selectedIds.has(item.id)) return false;
+    selected.push(item);
+    selectedIds.add(item.id);
+    sourceCounts.set(item.source || "Unknown", (sourceCounts.get(item.source || "Unknown") || 0) + 1);
+    const section = sectionKeyForNews(item);
+    sectionCounts.set(section, (sectionCounts.get(section) || 0) + 1);
+    return true;
+  };
+
+  for (const section of prioritySections) {
+    const match = items.find((item) => sectionKeyForNews(item) === section && !selectedIds.has(item.id));
+    if (match) add(match);
+    if (selected.length >= Math.min(limit, prioritySections.length)) break;
+  }
 
   for (const item of items) {
+    if (selectedIds.has(item.id)) continue;
     const source = item.source || "Unknown";
-    const count = counts.get(source) || 0;
-    if (count < sourceCapFor(item)) {
-      selected.push(item);
-      counts.set(source, count + 1);
+    const section = sectionKeyForNews(item);
+    const sourceCount = sourceCounts.get(source) || 0;
+    const sectionCount = sectionCounts.get(section) || 0;
+    const sectionCap = section === "Regulation" ? 12 : section === "Others" ? 10 : 14;
+    if (sourceCount < sourceCapFor(item) && sectionCount < sectionCap) {
+      add(item);
     } else {
       overflow.push(item);
     }

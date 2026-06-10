@@ -2,12 +2,12 @@ import { createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), "data", "cache");
-const CACHE_FILE = path.join(CACHE_DIR, "kissht-ipo.json");
+const CACHE_FILE = path.join(CACHE_DIR, "kissht-news.json");
 
-const IPO_TIMELINE = {
+const LISTING_TIMELINE = {
   openDate: "2026-04-30",
   closeDate: "2026-05-05",
   allotmentDate: "2026-05-06",
@@ -24,7 +24,6 @@ const MARKET_SYMBOL_CANDIDATES = (process.env.KISSHT_MARKET_SYMBOLS || "KISSHT.B
 
 export const KISSHT_ENTITY_TERMS = [
   "kissht",
-  "kissht ipo",
   "onemi",
   "onemi technologies",
   "onemi technology",
@@ -37,23 +36,6 @@ export const KISSHT_ENTITY_TERMS = [
   "si creva capital",
   "kissht nbfc",
   "kissht digital lending",
-];
-
-const IPO_TERMS = [
-  "ipo",
-  "drhp",
-  "rhp",
-  "sebi",
-  "price band",
-  "gmp",
-  "grey market",
-  "subscription",
-  "allotment",
-  "listing",
-  "broker note",
-  "review",
-  "recommendation",
-  "anchor investor",
 ];
 
 const KISSHT_NEWS_TERMS = [
@@ -70,97 +52,19 @@ const NEWS_SOURCES = [
   { name: "Google News - Kissht IR", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology Solutions") (investor relations OR earnings OR results OR AUM OR profitability OR presentation) when:45d' },
   { name: "Google News - Kissht Credit", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology Solutions" OR "Si Creva") (rating OR CRISIL OR ICRA OR CARE OR "asset quality" OR "credit cost" OR NPA) when:60d' },
   { name: "Google News - Kissht Product", reliability: 2, type: "aggregator", query: '(Kissht OR "OnEMI Technology Solutions") ("secured lending" OR "digital loan" OR "personal loan" OR MSME OR "loan against property" OR product) when:60d' },
-  { name: "Economic Times", reliability: 2, type: "news", query: 'site:economictimes.indiatimes.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR RBI OR IPO) when:30d' },
+  { name: "Economic Times", reliability: 2, type: "news", query: 'site:economictimes.indiatimes.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR RBI) when:30d' },
   { name: "ET BFSI", reliability: 2, type: "news", query: 'site:bfsi.economictimes.indiatimes.com (Kissht OR "OnEMI Technologies" OR "SI Creva") when:30d' },
-  { name: "LiveMint", reliability: 2, type: "news", query: 'site:livemint.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
-  { name: "Moneycontrol", reliability: 2, type: "news", query: 'site:moneycontrol.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR share price OR listing OR results OR IPO) when:30d' },
-  { name: "Business Standard", reliability: 2, type: "news", query: 'site:business-standard.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
-  { name: "Financial Express", reliability: 2, type: "news", query: 'site:financialexpress.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
-  { name: "BusinessLine", reliability: 2, type: "news", query: 'site:thehindubusinessline.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
-  { name: "CNBC TV18", reliability: 2, type: "news", query: 'site:cnbctv18.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
-  { name: "NDTV Profit", reliability: 2, type: "news", query: 'site:ndtvprofit.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending OR IPO) when:30d' },
-  { name: "Inc42", reliability: 2, type: "news", query: 'site:inc42.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (fintech OR lending OR IPO OR listing OR funding) when:45d' },
-  { name: "Entrackr", reliability: 2, type: "news", query: 'site:entrackr.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (fintech OR lending OR IPO OR listing OR funding) when:45d' },
-  { name: "YourStory", reliability: 2, type: "news", query: 'site:yourstory.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (fintech OR lending OR IPO OR listing OR funding) when:45d' },
+  { name: "LiveMint", reliability: 2, type: "news", query: 'site:livemint.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending) when:30d' },
+  { name: "Moneycontrol", reliability: 2, type: "news", query: 'site:moneycontrol.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR share price OR listing OR results) when:30d' },
+  { name: "Business Standard", reliability: 2, type: "news", query: 'site:business-standard.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending) when:30d' },
+  { name: "Financial Express", reliability: 2, type: "news", query: 'site:financialexpress.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending) when:30d' },
+  { name: "BusinessLine", reliability: 2, type: "news", query: 'site:thehindubusinessline.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending) when:30d' },
+  { name: "CNBC TV18", reliability: 2, type: "news", query: 'site:cnbctv18.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending) when:30d' },
+  { name: "NDTV Profit", reliability: 2, type: "news", query: 'site:ndtvprofit.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (stock OR listing OR results OR lending) when:30d' },
+  { name: "Inc42", reliability: 2, type: "news", query: 'site:inc42.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (fintech OR lending OR listing OR funding) when:45d' },
+  { name: "Entrackr", reliability: 2, type: "news", query: 'site:entrackr.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (fintech OR lending OR listing OR funding) when:45d' },
+  { name: "YourStory", reliability: 2, type: "news", query: 'site:yourstory.com (Kissht OR "OnEMI Technologies" OR "SI Creva") (fintech OR lending OR listing OR funding) when:45d' },
   { name: "Medianama", reliability: 2, type: "news", query: 'site:medianama.com (Kissht OR "OnEMI Technologies" OR "SI Creva") when:45d' },
-];
-
-const IPO_DIRECT_SOURCES = [
-  {
-    name: "IPOJi",
-    reliability: 4,
-    type: "gmp",
-    url: "https://www.ipoji.com/blog/onemi-technology-solutions-ipo-2026-full-details-gmp-allotment-review/",
-    fallbackTitle: "OnEMI Technology Solutions IPO 2026 - IPOJi",
-  },
-  {
-    name: "LamfIndia",
-    reliability: 4,
-    type: "gmp",
-    url: "https://lamfindia.com/ipo/details/onemi-technology-solutions-gmp",
-    fallbackTitle: "OnEMI Technology Solutions (Kissht) IPO GMP",
-  },
-  {
-    name: "InvestorGain GMP",
-    reliability: 4,
-    type: "gmp",
-    url: "https://www.investorgain.com/gmp/onemi-technology-ipo-gmp/1591/",
-    fallbackTitle: "OnEMI Technology IPO GMP - InvestorGain",
-  },
-  {
-    name: "InvestorGain Subscription",
-    reliability: 4,
-    type: "ipo-portal",
-    url: "https://www.investorgain.com/subscription/onemi-technology-ipo/1591/",
-    fallbackTitle: "OnEMI Technology IPO Subscription - InvestorGain",
-  },
-  {
-    name: "Moneycontrol IPO",
-    reliability: 2,
-    type: "ipo-portal",
-    url: "https://www.moneycontrol.com/ipo/onemi-technology-solutions-ltd-ots-ipodetail",
-    fallbackTitle: "OnEMI Technology Solutions Ltd IPO - Moneycontrol",
-  },
-  {
-    name: "INDmoney IPO",
-    reliability: 4,
-    type: "ipo-portal",
-    url: "https://www.indmoney.com/ipo/onemi-technology-solutions-ltd-ipo",
-    fallbackTitle: "OnEMI Technology Solutions Ltd IPO - INDmoney",
-  },
-  {
-    name: "Goodreturns IPO",
-    reliability: 4,
-    type: "ipo-portal",
-    url: "https://www.goodreturns.in/ipo/onemi-technology-solutions-ipo/",
-    fallbackTitle: "OnEMI Technology Solutions IPO - Goodreturns",
-  },
-];
-
-const GMP_SOURCES = [
-  ["Chittorgarh", "https://www.chittorgarh.com/ipo_gmp/onemi-technology-ipo/1591/"],
-  ["Chittorgarh Search", "https://www.chittorgarh.com/search?q=OnEMI%20Technology%20Solutions%20IPO%20GMP"],
-  ["IPOJi", "https://www.ipoji.com/blog/onemi-technology-solutions-ipo-2026-full-details-gmp-allotment-review/"],
-  ["LamfIndia", "https://lamfindia.com/ipo/details/onemi-technology-solutions-gmp"],
-  ["InvestorGain GMP", "https://www.investorgain.com/gmp/onemi-technology-ipo-gmp/1591/"],
-  ["InvestorGain Subscription", "https://www.investorgain.com/subscription/onemi-technology-ipo/1591/"],
-  ["InvestorGain Recommendations", "https://www.investorgain.com/recommendations/onemi-technology-ipo/1591/"],
-  ["IPOWatch", "https://ipowatch.in/?s=OnEMI+Technology+IPO+GMP"],
-  ["IPO Central", "https://ipocentral.in/?s=OnEMI+Technology+IPO+GMP"],
-  ["5paisa IPO", "https://www.5paisa.com/ipo"],
-  ["Angel One IPO", "https://www.angelone.in/ipo"],
-  ["Groww IPO", "https://groww.in/ipo"],
-];
-
-const SUBSCRIPTION_SOURCES = [
-  ["NSE IPO", "https://www.nseindia.com/market-data/issue-information", 1],
-  ["BSE IPO", "https://www.bseindia.com/static/markets/PublicIssues/IPONew.aspx", 1],
-  ["Chittorgarh Subscription", "https://www.chittorgarh.com/ipo_subscription/onemi-technology-ipo/1591/", 4],
-  ["Chittorgarh IPO", "https://www.chittorgarh.com/ipo/onemi-technology-ipo/1591/", 4],
-  ["InvestorGain Subscription", "https://www.investorgain.com/subscription/onemi-technology-ipo/1591/", 4],
-  ["IPO Watch Subscription", "https://ipowatch.in/?s=OnEMI+Technology+IPO+subscription", 4],
-  ["IPO Central Subscription", "https://ipocentral.in/?s=OnEMI+Technology+IPO+subscription", 4],
-  ["Moneycontrol IPO", "https://www.moneycontrol.com/ipo/onemi-technology-solutions-ltd-ots-ipodetail", 2],
 ];
 
 const BROKERS = [
@@ -178,29 +82,26 @@ const RISK_KEYWORDS = [
   "rbi", "sebi", "litigation", "legal", "court", "penalty", "data privacy", "dpdp",
   "digital lending guidelines", "fldg", "overleveraging", "bureau", "liquidity", "downgrade",
   "rating downgrade", "loss", "decline", "weak", "avoid", "expensive valuation",
-  "stretched valuation", "low subscription", "gmp fall", "gmp down", "listing loss",
+  "stretched valuation", "listing loss",
   "muted listing", "negative review", "unsecured loans", "regulatory risks", "risks to watch",
   "borrowings have risen", "unpredictable", "rising borrowings",
   "sell-off", "share price fall", "stock down", "volume spike", "lower circuit", "upper circuit",
 ];
 
 const POSITIVE_TERMS = [
-  "strong subscription", "gmp rise", "subscribe", "healthy growth", "profitability improvement",
+  "healthy growth", "profitability improvement",
   "asset quality improvement", "successful anchor", "listing gain", "positive valuation",
   "oversubscribed", "robust demand",
 ];
 
 const NEGATIVE_TERMS = [
-  "avoid", "gmp fall", "gmp down", "weak subscription", "regulatory concern", "rbi issue",
+  "avoid", "regulatory concern", "rbi issue",
   "asset quality concern", "credit cost", "governance concern", "legal issue", "fraud",
   "loss", "declining profitability", "high valuation", "customer complaint", "muted listing",
 ];
 
 const TOPIC_RULES = [
-  ["IPO launch / price band", ["price band", "issue opens", "ipo date", "lot size", "fresh issue", "offer for sale"]],
-  ["GMP", ["gmp", "grey market", "listing gain"]],
-  ["Subscription", ["subscription", "subscribed", "qib", "nii", "retail"]],
-  ["Broker note", ["broker note", "subscribe", "avoid", "recommendation", "analyst note", "ipo review"]],
+  ["Analyst / broker view", ["broker note", "analyst note", "recommendation", "coverage", "target price"]],
   ["Stock price / volume", ["share price", "stock", "volume", "bse", "nse", "market cap", "listed", "listing"]],
   ["IR / results", ["investor relations", "earnings", "quarterly", "results", "presentation", "aum"]],
   ["Business momentum", ["revenue", "profit", "active customer", "customer base", "disbursement", "loan book", "growth"]],
@@ -211,7 +112,7 @@ const TOPIC_RULES = [
   ["Governance", ["governance", "auditor", "resignation", "board"]],
   ["Litigation / complaints", ["litigation", "legal", "court", "complaint", "harassment"]],
   ["Digital lending sector", ["digital lending", "nbfc", "fintech lender"]],
-  ["Investor sentiment", ["investor sentiment", "demand", "grey market", "valuation"]],
+  ["Investor sentiment", ["investor sentiment", "public market", "market reaction", "valuation"]],
   ["Listing expectations", ["listing", "listing gain", "listing loss"]],
   ["Social commentary", ["reddit", "social", "forum"]],
   ["YouTube commentary", ["youtube", "video"]],
@@ -346,59 +247,6 @@ function parseRss(xml, source) {
   })).filter((item) => item.title && item.url);
 }
 
-function metaContent(html = "", name = "") {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const patterns = [
-    new RegExp(`<meta[^>]+property=["']${escaped}["'][^>]+content=["']([^"']+)["']`, "i"),
-    new RegExp(`<meta[^>]+name=["']${escaped}["'][^>]+content=["']([^"']+)["']`, "i"),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${escaped}["']`, "i"),
-  ];
-  return decodeEntities(patterns.map((pattern) => html.match(pattern)?.[1]).find(Boolean) || "");
-}
-
-function htmlTitle(html = "") {
-  return decodeEntities(metaContent(html, "og:title") || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "");
-}
-
-function canonicalFromHtml(html = "", fallback = "") {
-  const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1]
-    || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i)?.[1];
-  return normalizeUrl(canonical || fallback);
-}
-
-function htmlToText(html = "") {
-  return decodeEntities(String(html)
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " "));
-}
-
-function focusedSnippet(text = "") {
-  const lower = text.toLowerCase();
-  const anchors = ["gmp", "grey market", "price band", "subscription", "kissht", "onemi", "si creva"];
-  const index = anchors.map((term) => lower.indexOf(term)).find((position) => position >= 0);
-  if (index == null || index < 0) return text.slice(0, 240);
-  return text.slice(Math.max(0, index - 80), index + 260).trim();
-}
-
-function directSourceToItem(source, html) {
-  const text = htmlToText(html);
-  const title = htmlTitle(html) || source.fallbackTitle;
-  const description = metaContent(html, "description") || metaContent(html, "og:description") || focusedSnippet(text);
-  const publishedAt = metaContent(html, "article:published_time") || metaContent(html, "article:modified_time") || null;
-  return enrichNewsItem({
-    title,
-    snippet: description,
-    url: canonicalFromHtml(html, source.url),
-    publishedAt,
-    sourceName: source.name,
-    sourceType: source.type,
-    reliabilityLevel: source.reliability,
-    fetchedAt: nowIso(),
-    fullText: text,
-  });
-}
-
 export function getMatchedEntity(text = "") {
   const lower = text.toLowerCase();
   return [...KISSHT_ENTITY_TERMS].sort((a, b) => b.length - a.length).find((term) => lower.includes(term)) || null;
@@ -411,9 +259,7 @@ function relevanceScore(item) {
   if (!exactEntity) return 0;
   let score = 55;
   if (getMatchedEntity(title)) score += 20;
-  if (IPO_TERMS.some((term) => body.includes(term))) score += 15;
   if (KISSHT_NEWS_TERMS.some((term) => body.includes(term))) score += 15;
-  if (["kissht ipo", "onemi technologies ipo", "si creva capital ipo"].some((term) => body.includes(term))) score += 10;
   return Math.min(100, score);
 }
 
@@ -429,7 +275,7 @@ export function classifyKisshtSentiment(text = "") {
 export function classifyKisshtRisk(text = "", sourceType = "news") {
   const lower = text.toLowerCase();
   const matched = RISK_KEYWORDS.filter((term) => lower.includes(term));
-  const severe = ["fraud", "scam", "litigation", "court", "penalty", "rbi issue", "regulatory action", "avoid", "weak subscription", "listing loss"];
+  const severe = ["fraud", "scam", "litigation", "court", "penalty", "rbi issue", "regulatory action", "avoid", "listing loss"];
   const high = matched.some((term) => severe.includes(term)) || /rbi.{0,50}(action|restriction|penalty|ban|barred)|sebi.{0,50}(order|action|penalty)/i.test(lower);
   const medium = matched.some((term) => [
     "valuation", "complaint", "credit cost", "asset quality", "downgrade", "loss", "weak",
@@ -453,7 +299,7 @@ function materialityScore(item, risk) {
   const text = `${item.title} ${item.snippet}`.toLowerCase();
   let score = item.relevanceScore * 0.45 + item.reliabilityLevel * 8;
   if (["High", "Medium"].includes(risk.level)) score += risk.level === "High" ? 22 : 12;
-  if (["gmp", "subscription", "price band", "broker note", "subscribe", "avoid", "rhp", "drhp", "sebi", "financials", "asset quality", "valuation"].some((term) => text.includes(term))) score += 18;
+  if (["broker note", "analyst note", "recommendation", "coverage", "target price", "avoid", "sebi", "financials", "asset quality", "valuation", "stock", "share price", "volume", "results"].some((term) => text.includes(term))) score += 18;
   return Math.min(100, Math.round(score));
 }
 
@@ -461,10 +307,8 @@ function whyThisMatters(item) {
   const tags = item.categoryTags || [];
   if (tags.includes("Stock price / volume")) return "Post-listing price and volume moves help IR and leadership separate market signal from short-term noise.";
   if (tags.includes("IR / results")) return "Investor-facing operating updates shape management narrative, valuation context, and analyst questions.";
-  if (tags.includes("GMP")) return "Grey-market movement can influence retail narrative and listing expectations before pricing/listing.";
-  if (tags.includes("Subscription")) return "Subscription velocity is a live demand signal for pricing confidence and listing-day sentiment.";
-  if (tags.includes("Broker note")) return "Broker calls shape retail demand and can quickly become the dominant IPO narrative.";
-  if (item.sentiment === "Negative" || item.riskLevel !== "Low") return "Adverse commentary near the IPO window can require IR response, FAQ updates, or risk-context clarification.";
+  if (tags.includes("Analyst / broker view")) return "Analyst and broker coverage can shape public-market expectations and investor questions.";
+  if (item.sentiment === "Negative" || item.riskLevel !== "Low") return "Adverse commentary can require IR response, FAQ updates, or risk-context clarification.";
   if (tags.includes("Regulation / RBI")) return "Regulatory references matter because digital-lending compliance is central to investor diligence.";
   return "Direct Kissht/OnEMI/SI Creva coverage contributes to post-listing investor narrative, strategy watchpoints, and leadership context.";
 }
@@ -534,7 +378,7 @@ export function dedupeKisshtNews(items = []) {
 }
 
 async function fetchNewsSources() {
-  const rssPromise = Promise.allSettled(NEWS_SOURCES.map(async (source) => {
+  const rssResults = await Promise.allSettled(NEWS_SOURCES.map(async (source) => {
     const url = googleNewsUrl(source.query);
     const response = await fetchWithTimeout(url, {}, 6000);
     if (!response.ok) throw new Error(`${source.name} returned ${response.status}`);
@@ -555,27 +399,6 @@ async function fetchNewsSources() {
       },
     };
   }));
-  const directPromise = Promise.allSettled(IPO_DIRECT_SOURCES.map(async (source) => {
-    const response = await fetchWithTimeout(source.url, {}, 7000);
-    if (!response.ok) throw new Error(`${source.name} returned ${response.status}`);
-    const html = await readTextWithTimeout(response, 3500, `${source.name} page read`);
-    const item = directSourceToItem(source, html);
-    return {
-      source,
-      items: item.relevanceScore >= 70 ? [item] : [],
-      status: {
-        source: source.name,
-        sourceType: source.type,
-        reliabilityLevel: source.reliability,
-        url: source.url,
-        lastFetchedAt: nowIso(),
-        status: item.relevanceScore >= 70 ? "Working" : "Possible match",
-        itemCount: item.relevanceScore >= 70 ? 1 : 0,
-        message: item.relevanceScore >= 70 ? "Direct IPO/GMP page linked." : "Fetched page but did not meet strict Kissht relevance threshold.",
-      },
-    };
-  }));
-  const [rssResults, directResults] = await Promise.all([rssPromise, directPromise]);
   const rssStatuses = rssResults.map((result, index) => {
     const source = NEWS_SOURCES[index];
     if (result.status === "fulfilled") return result.value.status;
@@ -590,175 +413,10 @@ async function fetchNewsSources() {
       message: "Public feed unavailable for this refresh.",
     };
   });
-  const directStatuses = directResults.map((result, index) => {
-    const source = IPO_DIRECT_SOURCES[index];
-    if (result.status === "fulfilled") return result.value.status;
-    return {
-      source: source.name,
-      sourceType: source.type,
-      reliabilityLevel: source.reliability,
-      url: source.url,
-      lastFetchedAt: nowIso(),
-      status: "Failed",
-      itemCount: 0,
-      message: "Direct public page unavailable for this refresh.",
-    };
-  });
-  const rawItems = [
-    ...rssResults.flatMap((result) => result.status === "fulfilled" ? result.value.items : []),
-    ...directResults.flatMap((result) => result.status === "fulfilled" ? result.value.items : []),
-  ];
+  const rawItems = rssResults.flatMap((result) => result.status === "fulfilled" ? result.value.items : []);
   const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
   const recent = rawItems.filter((item) => !item.publishedAt || new Date(item.publishedAt).getTime() >= cutoff);
-  return { news: dedupeKisshtNews(recent), statuses: [...rssStatuses, ...directStatuses] };
-}
-
-export function extractGmpPoint(text = "", source = "Unknown", url = "") {
-  const lower = text.toLowerCase();
-  if (!lower.includes("gmp") && !lower.includes("grey market") && !lower.includes("premium")) return null;
-  const compact = text.replace(/\s+/g, " ");
-  const gmpPatterns = [
-    /(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)\s*(?:\/-)?\s+live\s+gmp\b/i,
-    /\b(?:live|latest|today'?s?)\s+gmp\s*(?:is|:)?\s*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/i,
-    /\bgmp\b\s*(?!price\b|date\b|for\b|information\b|status\b|dashboard\b|performance\b|guide\b|data\b)(?:is|:)?\s*(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/i,
-    /(?:rs\.?|inr|₹)\s*(-?\d+(?:\.\d+)?)\s+premium\b/i,
-    /\bpremium\b(?:\s+of|\s+around|\s+at|\s+is|:)?\s*(?:around\s*)?(?:rs\.?|inr|₹)?\s*(-?\d+(?:\.\d+)?)/i,
-  ];
-  const gmpMatch = gmpPatterns.map((pattern) => compact.match(pattern)).find(Boolean) || null;
-  const bandRangeMatch = text.match(/price\s*band[^\d]{0,30}(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)/i);
-  const bandSingleMatch = text.match(/(?:upper\s+price\s+band|cap\s+price|issue\s+price|price\s*\(₹\)|price)[^\d]{0,30}(?:rs\.?|inr|₹)?\s*(\d+(?:\.\d+)?)/i);
-  if (!gmpMatch) return null;
-  const gmp = Number(gmpMatch[1]);
-  const priceBand = bandRangeMatch ? Number(bandRangeMatch[2]) : bandSingleMatch ? Number(bandSingleMatch[1]) : null;
-  return {
-    source,
-    url,
-    timestamp: nowIso(),
-    gmp,
-    priceBand,
-    gmpPercent: priceBand ? Number(((gmp / priceBand) * 100).toFixed(2)) : null,
-    estimatedListingPrice: priceBand ? Number((priceBand + gmp).toFixed(2)) : null,
-    trend: "New",
-    reliabilityStatus: "Live",
-  };
-}
-
-function resolvePriceBand(point) {
-  const parsed = Number(point.priceBand);
-  if (Number.isFinite(parsed) && parsed >= IPO_TIMELINE.priceBandLow) return parsed;
-  return IPO_TIMELINE.priceBandHigh || null;
-}
-
-async function fetchGmpSources() {
-  const results = await Promise.allSettled(GMP_SOURCES.map(async ([source, url]) => {
-    const response = await fetchWithTimeout(url, {}, 6500);
-    if (!response.ok) throw new Error(`${source} returned ${response.status}`);
-    const html = await readTextWithTimeout(response, 3500, `${source} GMP page read`);
-    const text = htmlToText(html);
-    const point = getMatchedEntity(text) || /onemi|kissht|si\s*creva/i.test(url)
-      ? extractGmpPoint(text, source, canonicalFromHtml(html, url))
-      : null;
-    return {
-      source,
-      url,
-      point,
-      status: {
-        source,
-        url,
-        sourceType: "gmp",
-        reliabilityLevel: 4,
-        lastFetchedAt: nowIso(),
-        status: point ? "Working" : "Not available",
-        itemCount: point ? 1 : 0,
-        message: point ? "Live GMP value parsed from public page." : "No Kissht/OnEMI GMP value found on this public page.",
-      },
-    };
-  }));
-  return {
-    points: results.flatMap((result) => result.status === "fulfilled" && result.value.point ? [result.value.point] : []),
-    sources: results.map((result, index) => {
-      if (result.status === "fulfilled") return result.value.status;
-      const [source, url] = GMP_SOURCES[index];
-      return {
-        source,
-        url,
-        sourceType: "gmp",
-        reliabilityLevel: 4,
-        lastFetchedAt: nowIso(),
-        status: "Failed",
-        itemCount: 0,
-        message: "Public GMP page unavailable for this refresh.",
-      };
-    }),
-  };
-}
-
-function emptyGmpSourceSnapshot() {
-  return {
-    points: [],
-    sources: GMP_SOURCES.map(([source, url]) => ({
-      source,
-      url,
-      sourceType: "gmp",
-      reliabilityLevel: 4,
-      lastFetchedAt: nowIso(),
-      status: "Awaited",
-      itemCount: 0,
-      message: "GMP source not refreshed in fallback mode.",
-    })),
-  };
-}
-
-async function buildGmp(news, directSnapshot = null) {
-  const newsPoints = news
-    .map((item) => extractGmpPoint(`${item.title} ${item.snippet}`, item.sourceName, item.url))
-    .filter(Boolean);
-  const direct = directSnapshot || await fetchGmpSources();
-  const points = [...direct.points, ...newsPoints]
-    .filter((point) => Number.isFinite(point.gmp))
-    .map((point) => ({
-      ...point,
-      status: point.reliabilityStatus || "Live",
-      priceBand: resolvePriceBand(point),
-      gmpPercent: resolvePriceBand(point) ? Number(((point.gmp / resolvePriceBand(point)) * 100).toFixed(2)) : null,
-      estimatedListingPrice: resolvePriceBand(point) ? Number((resolvePriceBand(point) + point.gmp).toFixed(2)) : null,
-    }));
-  const sources = direct.sources.map((source) => {
-    if (source.status === "Working") return source;
-    const found = newsPoints.find((point) => point.url?.includes(new URL(source.url).hostname) || point.source === source.source);
-    return found ? { ...source, status: "Working", itemCount: 1, message: "Public GMP mention detected in news/search feed." } : source;
-  });
-  const uniquePoints = [];
-  for (const point of points) {
-    const existing = uniquePoints.find((candidate) => candidate.source === point.source && candidate.gmp === point.gmp);
-    if (!existing) uniquePoints.push(point);
-  }
-  const latest = uniquePoints
-    .sort((a, b) => {
-      const sourcePriority = {
-        "Chittorgarh": 5,
-        "InvestorGain GMP": 5,
-        "InvestorGain Subscription": 4,
-        "InvestorGain Recommendations": 4,
-        "LamfIndia": 3,
-        "Economic Times": 3,
-        "IPOJi": 2,
-      };
-      const priorityDelta = (sourcePriority[b.source] || 1) - (sourcePriority[a.source] || 1);
-      if (priorityDelta) return priorityDelta;
-      return new Date(b.timestamp) - new Date(a.timestamp);
-    })[0] || null;
-  return {
-    current: latest,
-    points: uniquePoints,
-    sourceCount: uniquePoints.length,
-    range: uniquePoints.length ? {
-      min: Math.min(...uniquePoints.map((point) => point.gmp)),
-      max: Math.max(...uniquePoints.map((point) => point.gmp)),
-    } : null,
-    status: uniquePoints.length ? "Live" : "Awaited / Not available from public sources",
-    sources,
-  };
+  return { news: dedupeKisshtNews(recent), statuses: rssStatuses };
 }
 
 function recommendationFromText(text = "") {
@@ -845,136 +503,6 @@ function buildRisk(news) {
     count48h: riskItems.filter((item) => !item.timestamp || new Date(item.timestamp).getTime() >= cutoff48).length,
     trend: riskItems.filter((item) => item.severity === "High").length ? "Elevated" : riskItems.length ? "Watch" : "Quiet",
     lastUpdatedAt: nowIso(),
-  };
-}
-
-function parseSubscriptionValue(text = "", labels = []) {
-  const clean = String(text).replace(/\s+/g, " ");
-  for (const label of labels) {
-    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const patterns = [
-      new RegExp(`${escaped}.{0,80}?(\\d+(?:\\.\\d+)?)\\s*(?:x|times|time)`, "i"),
-      new RegExp(`${escaped}.{0,80}?subscribed.{0,20}?(\\d+(?:\\.\\d+)?)`, "i"),
-      new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:x|times|time).{0,80}?${escaped}`, "i"),
-    ];
-    const match = patterns.map((pattern) => clean.match(pattern)).find(Boolean);
-    if (match) return Number(match[1]).toFixed(2);
-  }
-  return null;
-}
-
-function extractSubscriptionPoint(text = "", source = "Unknown", url = "") {
-  const lower = text.toLowerCase();
-  if (!/subscription|subscribed|qib|nii|retail|hni|employee/i.test(text)) return null;
-  if (!/kissht|onemi|si\s*creva|sicreva/i.test(`${text} ${url}`)) return null;
-
-  const qib = parseSubscriptionValue(text, ["QIB", "Qualified Institutional Buyers", "Qualified Institutional"]);
-  const nii = parseSubscriptionValue(text, ["NII", "HNI", "Non Institutional Investors", "Non-Institutional Investors"]);
-  const retail = parseSubscriptionValue(text, ["Retail", "RII", "Retail Individual Investors"]);
-  const employee = parseSubscriptionValue(text, ["Employee", "Employees"]);
-  const total = parseSubscriptionValue(text, ["Total", "Overall"]);
-  const hasAnyValue = [qib, nii, retail, employee, total].some(Boolean);
-  if (!hasAnyValue) return null;
-
-  return {
-    source,
-    url,
-    timestamp: nowIso(),
-    dayNumber: null,
-    qib,
-    nii,
-    retail,
-    employee,
-    total,
-    status: "Live",
-  };
-}
-
-async function fetchSubscriptionSources() {
-  const results = await Promise.allSettled(SUBSCRIPTION_SOURCES.map(async ([source, url, reliabilityLevel]) => {
-    const response = await fetchWithTimeout(url, {}, 6500);
-    if (!response.ok) throw new Error(`${source} returned ${response.status}`);
-    const html = await readTextWithTimeout(response, 3500, `${source} subscription page read`);
-    const text = htmlToText(html);
-    const point = extractSubscriptionPoint(text, source, canonicalFromHtml(html, url));
-    return {
-      point,
-      status: {
-        source,
-        url,
-        sourceType: "subscription",
-        reliabilityLevel,
-        lastFetchedAt: nowIso(),
-        status: point ? "Working" : "Awaited",
-        itemCount: point ? 1 : 0,
-        message: point ? "Category-wise subscription parsed from public page." : "Public subscription table not live or not parseable yet.",
-      },
-    };
-  }));
-  return {
-    points: results.flatMap((result) => result.status === "fulfilled" && result.value.point ? [result.value.point] : []),
-    sources: results.map((result, index) => {
-      if (result.status === "fulfilled") return result.value.status;
-      const [source, url, reliabilityLevel] = SUBSCRIPTION_SOURCES[index];
-      return {
-        source,
-        url,
-        sourceType: "subscription",
-        reliabilityLevel,
-        lastFetchedAt: nowIso(),
-        status: "Failed",
-        itemCount: 0,
-        message: "Public subscription page unavailable for this refresh.",
-      };
-    }),
-  };
-}
-
-function latestSubscriptionPoint(points = []) {
-  return [...points].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))[0] || null;
-}
-
-function buildSubscription(news, directSnapshot = null) {
-  const newsPoints = news
-    .map((item) => extractSubscriptionPoint(`${item.title} ${item.snippet}`, item.sourceName, item.url))
-    .filter(Boolean);
-  const direct = directSnapshot || { points: [], sources: SUBSCRIPTION_SOURCES.map(([source, url, reliabilityLevel]) => ({
-    source,
-    url,
-    sourceType: "subscription",
-    reliabilityLevel,
-    lastFetchedAt: nowIso(),
-    status: "Awaited",
-    itemCount: 0,
-    message: "Starts when IPO opens / public subscription table appears.",
-  })) };
-  const points = [...direct.points, ...newsPoints];
-  const current = latestSubscriptionPoint(points);
-  const categoryMap = [
-    ["QIB", "qib"],
-    ["NII / HNI", "nii"],
-    ["Retail", "retail"],
-    ["Employee", "employee"],
-    ["Total", "total"],
-  ];
-  const sourceRows = direct.sources.map((source) => {
-    if (source.status === "Working") return source;
-    const found = newsPoints.find((point) => point.source === source.source || point.url?.includes("subscription"));
-    return found ? { ...source, status: "Working", itemCount: 1, message: "Public subscription mention detected in news/search feed." } : source;
-  });
-  return {
-    current,
-    categories: categoryMap.map(([category, key]) => ({
-      category,
-      current: current?.[key] || null,
-      change: null,
-      source: current?.[key] ? current.source : "Awaited",
-      timestamp: current?.[key] ? current.timestamp : null,
-      status: current?.[key] ? "Live" : "Awaited",
-    })),
-    history: points,
-    sources: sourceRows,
-    status: current ? "Live" : "Starts when IPO opens / Awaited",
   };
 }
 
@@ -1159,7 +687,7 @@ function buildYoutube() {
   };
 }
 
-function buildLiveTape(news, risk, gmp, brokers, subscription, stockMarket) {
+function buildLiveTape(news, risk, brokers, stockMarket) {
   const latestNews = [...news]
     .sort((a, b) => new Date(b.publishedAt || b.updatedAt || 0) - new Date(a.publishedAt || a.updatedAt || 0))[0] || null;
   const latestRisk = risk.topFive?.[0] || null;
@@ -1214,7 +742,7 @@ function sentimentToneForPayload(sentiment) {
   return "neutral";
 }
 
-function buildSummary(news, risk, gmp, brokers, youtube, social, subscription, stockMarket) {
+function buildSummary(news, risk, brokers, youtube, social, stockMarket) {
   const lastHour = Date.now() - 60 * 60 * 1000;
   const today = Date.now() - 24 * 60 * 60 * 1000;
   const recentNews = news.filter((item) => item.publishedAt && new Date(item.publishedAt).getTime() >= lastHour);
@@ -1250,10 +778,6 @@ function buildSummary(news, risk, gmp, brokers, youtube, social, subscription, s
       marketLine,
       priceTrend: stockMarket?.current?.changePercent == null ? "Awaited" : `${stockMarket.current.changePercent}% day move`,
       volumeTrend: stockMarket?.current?.volumeLabel || "Awaited",
-      listingArchive: {
-        gmpTrend: gmp.current ? gmp.current.trend : "Archive only",
-        subscriptionTrend: subscription.current ? "Final subscription sourced" : "Archive awaited",
-      },
       brokerSummary: brokers.summary,
       youtubeNarrative: youtube.items[0]?.title || "YouTube data unavailable without API/public feed.",
       socialNarrative: social.items[0]?.text || "No high-confidence public social chatter found.",
@@ -1300,7 +824,7 @@ async function writeCache(payload) {
       cached: true,
       savedAt: nowIso(),
       ttlMinutes: 15,
-      storage: process.env.VERCEL ? "/tmp runtime cache" : "data/cache/kissht-ipo.json",
+      storage: process.env.VERCEL ? "/tmp runtime cache" : "data/cache/kissht-news.json",
     },
   };
   await writeFile(CACHE_FILE, JSON.stringify(cached, null, 2), "utf8");
@@ -1308,24 +832,19 @@ async function writeCache(payload) {
 }
 
 async function buildKisshtIpoPayload() {
-  const [{ news, statuses: newsStatuses }, social, directGmp, directSubscription, stockMarket] = await Promise.all([
+  const [{ news, statuses: newsStatuses }, social, stockMarket] = await Promise.all([
     withTimeout(fetchNewsSources(), 10000, "Kissht news refresh"),
     fetchXSocial(),
-    withTimeout(fetchGmpSources(), 9000, "Kissht GMP refresh"),
-    withTimeout(fetchSubscriptionSources(), 9000, "Kissht subscription refresh"),
     withTimeout(fetchMarketData(), 9000, "Kissht market data refresh").catch((error) => emptyMarketData(error.message)),
   ]);
   const risk = buildRisk(news);
-  const gmp = await buildGmp(news, directGmp);
   const brokers = buildBrokerNotes(news);
   const youtube = buildYoutube();
-  const subscription = buildSubscription(news, directSubscription);
-  const summary = buildSummary(news, risk, gmp, brokers, youtube, social, subscription, stockMarket);
-  const liveTape = buildLiveTape(news, risk, gmp, brokers, subscription, stockMarket);
+  const summary = buildSummary(news, risk, brokers, youtube, social, stockMarket);
+  const liveTape = buildLiveTape(news, risk, brokers, stockMarket);
   const sourceStatus = [
     ...newsStatuses,
     ...(stockMarket.sources || []),
-    ...gmp.sources,
     ...brokers.notes.map((note) => ({
       source: note.broker,
       sourceType: "broker",
@@ -1337,7 +856,6 @@ async function buildKisshtIpoPayload() {
     })),
     ...youtube.sources,
     ...social.statuses,
-    ...subscription.sources,
   ];
   return {
     updatedAt: nowIso(),
@@ -1345,21 +863,19 @@ async function buildKisshtIpoPayload() {
     news,
     possibleMatches: [],
     risk,
-    gmp,
     brokers,
     youtube,
     social,
-    subscription,
     stockMarket,
     summary,
     liveTape,
-    ipoTimeline: IPO_TIMELINE,
+    ipoTimeline: LISTING_TIMELINE,
     sourceStatus,
     sourceReliability: [
       { level: 1, label: "Official / regulatory" },
       { level: 2, label: "Reputed financial media / market data" },
       { level: 3, label: "Broker / analyst" },
-      { level: 4, label: "Market / IPO portal" },
+      { level: 4, label: "Market / public portal" },
       { level: 5, label: "YouTube / social / forums" },
     ],
   };
@@ -1383,11 +899,9 @@ export async function getKisshtIpoSnapshot({ forceRefresh = false, allowStale = 
       };
     }
     const emptyRisk = buildRisk([]);
-    const emptyGmp = await buildGmp([], emptyGmpSourceSnapshot());
     const emptyBrokers = buildBrokerNotes([]);
     const emptyYoutube = buildYoutube();
     const emptySocial = { items: [], statuses: [] };
-    const emptySubscription = buildSubscription([]);
     const emptyMarket = emptyMarketData();
     const empty = {
       updatedAt: nowIso(),
@@ -1395,15 +909,13 @@ export async function getKisshtIpoSnapshot({ forceRefresh = false, allowStale = 
       news: [],
       possibleMatches: [],
       risk: emptyRisk,
-      gmp: emptyGmp,
       brokers: emptyBrokers,
       youtube: emptyYoutube,
       social: emptySocial,
-      subscription: emptySubscription,
       stockMarket: emptyMarket,
-      summary: buildSummary([], emptyRisk, emptyGmp, emptyBrokers, emptyYoutube, emptySocial, emptySubscription, emptyMarket),
-      liveTape: buildLiveTape([], emptyRisk, emptyGmp, emptyBrokers, emptySubscription, emptyMarket),
-      ipoTimeline: IPO_TIMELINE,
+      summary: buildSummary([], emptyRisk, emptyBrokers, emptyYoutube, emptySocial, emptyMarket),
+      liveTape: buildLiveTape([], emptyRisk, emptyBrokers, emptyMarket),
+      ipoTimeline: LISTING_TIMELINE,
       sourceStatus: [],
       error: "Kissht real-time news sources unavailable; no fabricated data shown.",
       cache: { cached: false, fallback: true, refreshError: error.message },
@@ -1425,7 +937,7 @@ export function sliceKisshtPayload(payload, key) {
   return {
     updatedAt: payload.updatedAt,
     cache: payload.cache || null,
-    [key]: payload[key],
+    [key]: payload[key] || null,
     sourceStatus: (payload.sourceStatus || []).filter((source) => source.sourceType === key || (key === "news" && ["news", "aggregator"].includes(source.sourceType))),
     error: payload.error || null,
   };

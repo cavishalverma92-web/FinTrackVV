@@ -83,12 +83,12 @@ export default function Sidebar({ activeTab, onTabChange, open = false, onClose,
             Command Center
           </p>
           <Link
-            href="/kissht-ipo"
+            href="/kissht-news"
             onClick={onClose}
             className="flex items-center gap-3 px-3 py-2.5 rounded-md border border-[var(--border-subtle)] bg-[var(--paper-highlight)] text-sm font-medium text-[var(--accent-burgundy)] hover:bg-[var(--bg-card)]"
           >
             <ShieldAlert size={16} />
-            <span>Kissht IPO</span>
+            <span>Kissht News</span>
           </Link>
         </div>
 

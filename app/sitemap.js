@@ -32,6 +32,12 @@ export default async function sitemap() {
       changeFrequency: "daily",
       priority: 0.7,
     },
+    {
+      url: `${baseUrl}/kissht-news`,
+      lastModified: intelligence.updatedAt || new Date().toISOString(),
+      changeFrequency: "hourly",
+      priority: 0.8,
+    },
     ...articles,
     ...entities,
   ];

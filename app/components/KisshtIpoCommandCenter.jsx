@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -16,6 +17,21 @@ import {
   Sun,
   Video,
 } from "lucide-react";
+
+const StockMarketChart = dynamic(() => import("./KisshtStockMarketChart"), {
+  ssr: false,
+  loading: () => (
+    <section className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] card-shadow">
+      <div className="border-b border-[var(--border-subtle)] px-4 py-3">
+        <h2 className="font-display text-lg font-bold tracking-tight">Daily Stock Price & Volume</h2>
+        <p className="mt-1 text-xs text-[var(--text-dim)]">Loading market chart...</p>
+      </div>
+      <div className="p-4">
+        <div className="h-[320px] animate-pulse rounded-md bg-[var(--bg-elevated)]" />
+      </div>
+    </section>
+  ),
+});
 
 const EMPTY_FILTERS = {
   sentiment: "All",
@@ -44,6 +60,18 @@ function ageLabel(value) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function money(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "Awaited";
+  return `Rs ${number.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+function marketTone(changePercent) {
+  if (changePercent > 0) return "positive";
+  if (changePercent < 0) return "negative";
+  return "neutral";
 }
 
 function Badge({ children, tone = "neutral" }) {
@@ -129,6 +157,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
   const youtube = snapshot.youtube || { items: [] };
   const social = snapshot.social || { items: [] };
   const subscription = snapshot.subscription || { categories: [] };
+  const stockMarket = snapshot.stockMarket || { points: [], sources: [] };
   const sourceStatus = snapshot.sourceStatus || [];
   const summary = snapshot.summary || {};
   const ipoTimeline = snapshot.ipoTimeline || {};
@@ -167,11 +196,11 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
       detail: item.reason,
       url: item.url,
     })),
-    ...(gmp.current ? [{
-      tone: "positive",
-      title: `Latest sourced GMP: Rs ${gmp.current.gmp}`,
-      detail: gmp.current.gmpPercent == null ? gmp.current.source : `${gmp.current.gmpPercent}% from ${gmp.current.source}`,
-      url: gmp.current.url,
+    ...(stockMarket.current ? [{
+      tone: marketTone(stockMarket.current.changePercent),
+      title: `Latest close: ${money(stockMarket.current.close)}`,
+      detail: stockMarket.current.changePercent == null ? stockMarket.symbol : `${stockMarket.current.changePercent}% on ${stockMarket.current.volumeLabel || "volume awaited"} volume`,
+      url: stockMarket.sources?.find((source) => source.status === "Working")?.url,
     }] : []),
     ...sourceProblems.slice(0, 2).map((source) => ({
       tone: source.status === "Failed" ? "negative" : "warning",
@@ -181,11 +210,11 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
     })),
   ];
   const liveTape = snapshot.liveTape || [
-    { label: "GMP", value: gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited", detail: gmp.current?.source || gmp.status, tone: gmp.current ? "positive" : "warning", url: gmp.current?.url, timestamp: gmp.current?.timestamp },
-    { label: "Subscription", value: subscription.current?.total ? `${subscription.current.total}x` : "Awaited", detail: subscription.status, tone: subscription.current ? "positive" : "warning", url: subscription.current?.url, timestamp: subscription.current?.timestamp },
+    { label: "Stock Price", value: stockMarket.current ? money(stockMarket.current.close) : "Awaited", detail: stockMarket.message || "Daily market data awaited.", tone: marketTone(stockMarket.current?.changePercent), url: stockMarket.sources?.find((source) => source.status === "Working")?.url, timestamp: stockMarket.current?.timestamp },
+    { label: "Daily Volume", value: stockMarket.current?.volumeLabel || "Awaited", detail: stockMarket.current?.volume ? `${stockMarket.current.volume.toLocaleString("en-IN")} shares traded` : "Volume appears once market data resolves.", tone: stockMarket.current?.volume ? "blue" : "warning", timestamp: stockMarket.current?.timestamp },
     { label: "Latest Article", value: news[0]?.sourceName || "Awaited", detail: news[0]?.title || "No high-confidence story in selected window.", tone: news[0]?.sentiment === "Negative" ? "negative" : "neutral", url: news[0]?.url, timestamp: news[0]?.publishedAt },
     { label: "Adverse Narrative", value: risk.topFive?.[0]?.severity || "Quiet", detail: risk.topFive?.[0]?.headline || "No high-risk public narrative detected.", tone: risk.topFive?.[0]?.severity === "High" ? "negative" : risk.topFive?.[0] ? "warning" : "positive", url: risk.topFive?.[0]?.url, timestamp: risk.topFive?.[0]?.timestamp },
-    { label: "Broker Stance", value: brokers.summary?.subscribe ? "Subscribe seen" : "Awaited", detail: `${brokers.summary?.subscribe || 0} subscribe / ${brokers.summary?.avoid || 0} avoid`, tone: brokers.summary?.avoid ? "negative" : brokers.summary?.subscribe ? "positive" : "warning" },
+    { label: "IR / CEO Action", value: risk.topFive?.[0]?.severity === "High" ? "Prepare" : "Monitor", detail: risk.topFive?.[0]?.headline || "No urgent investor-response item found.", tone: risk.topFive?.[0]?.severity === "High" ? "negative" : risk.topFive?.[0] ? "warning" : "positive" },
   ];
 
   const refresh = async () => {
@@ -218,7 +247,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
             <button
               onClick={() => setNotificationsOpen((open) => !open)}
               className="relative inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs font-bold text-[var(--text-primary)] card-shadow"
-              aria-label="Open IPO notifications"
+              aria-label="Open Kissht news alerts"
             >
               <Bell size={15} />
               Alerts
@@ -238,7 +267,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
             {notificationsOpen && (
               <div className="absolute right-0 top-11 z-20 w-[min(92vw,380px)] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 card-shadow">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] font-mono">IPO Notifications</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] font-mono">News Alerts</p>
                   <button onClick={() => setNotificationsOpen(false)} className="text-[11px] text-[var(--text-dim)]">Close</button>
                 </div>
                 <div className="max-h-80 space-y-2 overflow-auto">
@@ -248,7 +277,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
                       <p className="text-sm font-semibold leading-snug">{note.title}</p>
                       <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-dim)]">{note.detail}</p>
                     </a>
-                  )) : <EmptyState>No active IPO alerts.</EmptyState>}
+                  )) : <EmptyState>No active Kissht alerts.</EmptyState>}
                 </div>
               </div>
             )}
@@ -266,10 +295,10 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
                 />
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--accent-burgundy)] font-mono">IPO War Room | By Vishal Verma</p>
-                <h1 className="font-display text-4xl font-bold tracking-tight md:text-5xl">Kissht IPO Command Center</h1>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--accent-burgundy)] font-mono">Real-Time News Room | By Vishal Verma</p>
+                <h1 className="font-display text-4xl font-bold tracking-tight md:text-5xl">Kissht Real-Time News Center</h1>
                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
-                  Real-time monitoring of news, GMP, broker notes, YouTube coverage, subscription and risk signals.
+                  Real-time monitoring of Kissht / OnEMI news, daily stock price and volume, investor narrative, IR watchouts, strategy signals and CEO briefing notes.
                 </p>
               </div>
             </div>
@@ -301,15 +330,16 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
           news={news}
           brokers={brokers}
           ipoTimeline={ipoTimeline}
+          stockMarket={stockMarket}
         />
 
-        <WarRoomPanel gmp={gmp} subscription={subscription} ipoTimeline={ipoTimeline} />
+        <MarketPulsePanel stockMarket={stockMarket} ipoTimeline={ipoTimeline} />
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <Section
               title="Live News Timeline"
-              subtitle="High-confidence Kissht / OnEMI / SI Creva public coverage from the latest 48-hour window."
+              subtitle="High-confidence Kissht / OnEMI / SI Creva public coverage for IR, strategy and leadership monitoring."
               action={<Badge tone="blue">{filteredNews.length} visible</Badge>}
             >
               <div className="mb-4 flex flex-wrap gap-2">
@@ -361,9 +391,10 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
                 `${summary.daily?.topDevelopments?.length || 0} top developments tracked today.`,
                 `Sentiment split: ${sentimentSplit.positive} positive / ${sentimentSplit.neutral} neutral / ${sentimentSplit.negative} negative.`,
                 summary.daily?.mostImportantNegative?.headline ? `Key negative: ${summary.daily.mostImportantNegative.headline}` : "No major negative story detected.",
-                `GMP: ${summary.daily?.gmpTrend || "Awaited"}; Subscription: ${summary.daily?.subscriptionTrend || "Awaited"}.`,
+                summary.daily?.marketLine || "Market data awaited until a listed symbol resolves.",
               ]} />
             </div>
+            <RoleBriefs roleBriefs={summary.roleBriefs} />
           </div>
 
           <aside className="space-y-4">
@@ -407,8 +438,7 @@ export default function KisshtIpoCommandCenter({ initialSnapshot }) {
         </div>
 
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          <GmpSection gmp={gmp} />
-          <SubscriptionSection subscription={subscription} />
+          <ListingArchiveSection gmp={gmp} subscription={subscription} ipoTimeline={ipoTimeline} />
           <BrokerSection brokers={brokers} />
           <YoutubeSection youtube={youtube} />
           <SocialSection social={social} />
@@ -425,7 +455,7 @@ function LiveTape({ items = [], updatedAt }) {
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-2 w-2 rounded-full bg-[var(--accent-green)] pulse-live" />
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-dim)] font-mono">IPO Live Tape</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--text-dim)] font-mono">Kissht Live Tape</p>
         </div>
         <span className="ml-auto text-[10px] text-[var(--text-dim)] font-mono">Checked {formatDate(updatedAt)}</span>
       </div>
@@ -460,18 +490,15 @@ function ipoWindowLabel(ipoTimeline = {}) {
     return days <= 1 ? "Opens tomorrow" : `Opens in ${days} days`;
   }
   if (open && close && now >= open && now <= close) return "Issue open";
-  if (close && now > close) return "Issue closed";
-  return "IPO window";
+  if (close && now > close) return "Listed / Post-IPO";
+  return "Post-listing watch";
 }
 
-function CommandSummary({ gmp, subscription, risk, news, brokers, ipoTimeline }) {
+function CommandSummary({ risk, news, brokers, ipoTimeline, stockMarket }) {
   const publicCoverage = `${news.length} high-confidence stories`;
-  const gmpLine = gmp.current
-    ? `GMP Rs ${gmp.current.gmp}${gmp.current.gmpPercent == null ? "" : ` (${gmp.current.gmpPercent}%)`} from ${gmp.current.source}`
-    : "GMP awaited from public sources";
-  const demandLine = subscription.current?.total
-    ? `Total subscription ${subscription.current.total}x from ${subscription.current.source}`
-    : "Demand data awaited until public subscription table appears";
+  const marketLine = stockMarket?.current
+    ? `Latest close ${money(stockMarket.current.close)}${stockMarket.current.changePercent == null ? "" : ` (${stockMarket.current.changePercent}%)`} on volume ${stockMarket.current.volumeLabel || "unavailable"}`
+    : stockMarket?.message || "Market data awaited until a listed symbol resolves";
   const riskLine = (risk.highRiskAlerts || []).length
     ? `${risk.highRiskAlerts.length} high-risk item(s); prepare IR context`
     : risk.count24h
@@ -491,19 +518,19 @@ function CommandSummary({ gmp, subscription, risk, news, brokers, ipoTimeline })
             <Badge tone="blue">{ipoWindowLabel(ipoTimeline)}</Badge>
             <Badge tone={action === "Prepare response" ? "negative" : action === "Monitor" ? "warning" : "positive"}>{action}</Badge>
             <span className="text-[10px] text-[var(--text-dim)] font-mono">
-              Price band {ipoTimeline.priceBandLow && ipoTimeline.priceBandHigh ? `Rs ${ipoTimeline.priceBandLow}-${ipoTimeline.priceBandHigh}` : "awaited"} / Lot {ipoTimeline.lotSize || "awaited"}
+              Listed {ipoTimeline.listingDate || "awaited"} / issue price {ipoTimeline.priceBandHigh ? `Rs ${ipoTimeline.priceBandHigh}` : "awaited"}
             </span>
           </div>
-          <h2 className="font-display text-2xl font-bold tracking-tight">Executive Command Summary</h2>
+          <h2 className="font-display text-2xl font-bold tracking-tight">Executive News Summary</h2>
           <p className="mt-2 max-w-4xl text-sm leading-relaxed text-[var(--text-secondary)]">
-            {gmpLine}. {demandLine}. {riskLine}. Public coverage: {publicCoverage}.
+            {marketLine}. {riskLine}. Public coverage: {publicCoverage}.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          <SignalTile label="Grey market" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} detail={gmp.current?.gmpPercent == null ? "No sourced %" : `${gmp.current.gmpPercent}% of upper band`} />
-          <SignalTile label="Demand" value={subscription.current?.total ? `${subscription.current.total}x` : "Awaited"} detail="QIB / NII / Retail source-backed only" />
+          <SignalTile label="Stock price" value={stockMarket?.current ? money(stockMarket.current.close) : "Awaited"} detail={stockMarket?.symbol || "Symbol resolution pending"} />
+          <SignalTile label="Daily volume" value={stockMarket?.current?.volumeLabel || "Awaited"} detail={stockMarket?.current?.volume ? `${stockMarket.current.volume.toLocaleString("en-IN")} shares` : "Daily candle source-backed only"} />
           <SignalTile label="Narrative" value={risk.trend || "Quiet"} detail={`${risk.count24h || 0} risk-linked in 24h`} />
-          <SignalTile label="Broker stance" value={`${brokers.summary?.subscribe || 0}/${brokers.summary?.avoid || 0}`} detail="Subscribe / avoid public calls" />
+          <SignalTile label="Public calls" value={`${brokers.summary?.subscribe || 0}/${brokers.summary?.avoid || 0}`} detail="Positive / adverse public calls" />
         </div>
       </div>
     </section>
@@ -520,46 +547,70 @@ function SignalTile({ label, value, detail }) {
   );
 }
 
-function WarRoomPanel({ gmp, subscription, ipoTimeline }) {
+function MarketPulsePanel({ stockMarket, ipoTimeline }) {
+  const points = stockMarket?.points || [];
+  const current = stockMarket?.current || null;
+  const marketUrl = stockMarket?.sources?.find((source) => source.status === "Working")?.url;
   return (
     <section className="mb-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">Grey Market Signal</p>
-            <h2 className="mt-1 font-display text-xl font-bold">Source-wise premium monitor</h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">Market Signal</p>
+            <h2 className="mt-1 font-display text-xl font-bold">Daily price and volume monitor</h2>
           </div>
-          <Badge tone={gmp.current ? "positive" : "warning"}>{gmp.current ? "Sourced" : "Awaited"}</Badge>
+          <Badge tone={current ? "positive" : "warning"}>{stockMarket?.status || "Awaited"}</Badge>
         </div>
         <div className="grid gap-2 sm:grid-cols-4">
-          <MiniMetric label="Current GMP" value={gmp.current ? `Rs ${gmp.current.gmp}` : "Awaited"} />
-          <MiniMetric label="GMP %" value={gmp.current?.gmpPercent == null ? "Unavailable" : `${gmp.current.gmpPercent}%`} />
-          <MiniMetric label="Range" value={gmp.range && gmp.range.min !== gmp.range.max ? `Rs ${gmp.range.min}-${gmp.range.max}` : gmp.sourceCount || 0} />
-          <MiniMetric label="Price band" value={gmp.current?.priceBand ? `Rs ${gmp.current.priceBand}` : ipoTimeline.priceBandHigh ? `Rs ${ipoTimeline.priceBandLow}-${ipoTimeline.priceBandHigh}` : "Awaited"} />
+          <MiniMetric label="Close" value={current ? money(current.close) : "Awaited"} />
+          <MiniMetric label="Daily move" value={current?.changePercent == null ? "Awaited" : `${current.changePercent}%`} />
+          <MiniMetric label="Volume" value={current?.volumeLabel || "Awaited"} />
+          <MiniMetric label="Symbol" value={stockMarket?.symbol || "Awaited"} />
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-dim)]">
-          Values remain source-wise. No silent averaging; if public sources differ, use the range and source table below.
-        </p>
+        {marketUrl && (
+          <a href={marketUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[var(--accent-blue)] hover:underline">
+            Open market source <ExternalLink size={12} />
+          </a>
+        )}
       </div>
 
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 card-shadow">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">Subscription Watch</p>
-            <h2 className="mt-1 font-display text-xl font-bold">Opening window demand monitor</h2>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--accent-burgundy)] font-mono">Listing Context</p>
+            <h2 className="mt-1 font-display text-xl font-bold">IPO is closed; watch market reaction</h2>
           </div>
-          <Badge tone={subscription.current ? "positive" : "warning"}>{subscription.status || "Awaited"}</Badge>
+          <Badge tone="blue">{ipoWindowLabel(ipoTimeline)}</Badge>
         </div>
-        <div className="grid gap-2 sm:grid-cols-5">
-          {(subscription.categories || []).map((row) => (
-            <MiniMetric key={row.category} label={row.category} value={row.current ? `${row.current}x` : "Awaited"} />
-          ))}
+        <div className="grid gap-2 sm:grid-cols-3">
+          <MiniMetric label="Issue price" value={ipoTimeline.priceBandHigh ? money(ipoTimeline.priceBandHigh) : "Awaited"} />
+          <MiniMetric label="Listing date" value={ipoTimeline.listingDate || "Awaited"} />
+          <MiniMetric label="Lot size" value={ipoTimeline.lotSize || "Awaited"} />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-dim)]">
-          IPO open {ipoTimeline.openDate || "Apr 30"}; close {ipoTimeline.closeDate || "May 5"}; listing {ipoTimeline.listingDate || "May 8"}. Category data appears only when a public table is available.
+          This section now tracks post-listing signals for IR, strategy and CEO usage. GMP and subscription data remain below as archive-only context.
         </p>
       </div>
+
+      <div className="lg:col-span-2">
+        <StockMarketChart stockMarket={stockMarket} />
+      </div>
     </section>
+  );
+}
+
+function RoleBriefs({ roleBriefs = {} }) {
+  const cards = [
+    ["IR", roleBriefs.ir || ["No immediate investor-relations action detected."]],
+    ["Strategy", roleBriefs.strategy || ["No new strategic signal detected in current sources."]],
+    ["CEO", roleBriefs.ceo || ["No urgent leadership briefing item detected."]],
+  ];
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {cards.map(([title, bullets]) => (
+        <BriefCard key={title} title={`${title} Brief`} bullets={bullets} />
+      ))}
+    </div>
   );
 }
 
@@ -581,7 +632,7 @@ function NegativeNarrativePanel({ risk = {}, news = [] }) {
   }));
 
   return (
-    <Section title="Adverse Narrative Monitor" subtitle="Negative IPO commentary, valuation concerns and risk-language watchlist.">
+    <Section title="Adverse Narrative Monitor" subtitle="Negative news, investor concerns, valuation language and regulatory-risk watchlist.">
       <div className="mb-3 grid grid-cols-3 gap-2 text-center">
         <MiniMetric label="High" value={(risk.highRiskAlerts || []).length} />
         <MiniMetric label="24h" value={risk.count24h || 0} />
@@ -644,9 +695,29 @@ function BriefCard({ title, bullets }) {
   );
 }
 
-function GmpSection({ gmp }) {
+function ListingArchiveSection({ gmp, subscription, ipoTimeline }) {
   return (
-    <Section title="GMP Tracker" subtitle="Source-wise grey market premium tracking. No value is shown unless sourced.">
+    <Section
+      title="Listing Archive"
+      subtitle="Historical IPO context retained for investor conversations; live monitoring now focuses on news, price, volume and narrative."
+    >
+      <div className="mb-4 grid gap-2 md:grid-cols-3">
+        <MiniMetric label="Issue price" value={ipoTimeline.priceBandHigh ? money(ipoTimeline.priceBandHigh) : "Awaited"} />
+        <MiniMetric label="Listing date" value={ipoTimeline.listingDate || "Awaited"} />
+        <MiniMetric label="Final demand" value={subscription.current?.total ? `${subscription.current.total}x` : "Awaited"} />
+      </div>
+      <div className="space-y-4">
+        <GmpSection gmp={gmp} compact />
+        <SubscriptionSection subscription={subscription} compact />
+      </div>
+    </Section>
+  );
+}
+
+function GmpSection({ gmp, compact = false }) {
+  const content = (
+    <>
+      {compact && <p className="mb-2 text-xs font-bold">Historical GMP</p>}
       {gmp.current ? (
         <div className="mb-4 grid gap-2 md:grid-cols-3">
           <MiniMetric label="Current GMP" value={`Rs ${gmp.current.gmp}`} />
@@ -655,6 +726,14 @@ function GmpSection({ gmp }) {
         </div>
       ) : <EmptyState>GMP awaited from public sources.</EmptyState>}
       <GmpTable points={gmp.points || []} sources={gmp.sources || []} />
+    </>
+  );
+  if (compact) {
+    return <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">{content}</div>;
+  }
+  return (
+    <Section title="GMP Tracker" subtitle="Source-wise grey market premium tracking. No value is shown unless sourced.">
+      {content}
     </Section>
   );
 }
@@ -685,20 +764,29 @@ function GmpTable({ points, sources }) {
   );
 }
 
-function SubscriptionSection({ subscription }) {
-  return (
-    <Section title="Subscription Tracker" subtitle="QIB / NII / Retail values appear only after public IPO subscription sources go live.">
+function SubscriptionSection({ subscription, compact = false }) {
+  const content = (
+    <>
+      {compact && <p className="mb-2 text-xs font-bold">Historical Subscription</p>}
       <div className="mb-4 grid gap-2 md:grid-cols-5">
         {(subscription.categories || []).map((row) => <MiniMetric key={row.category} label={row.category} value={row.current || "Awaited"} />)}
       </div>
       <StatusTable rows={subscription.sources || []} />
+    </>
+  );
+  if (compact) {
+    return <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">{content}</div>;
+  }
+  return (
+    <Section title="Subscription Tracker" subtitle="QIB / NII / Retail values are archive-only after the issue closes.">
+      {content}
     </Section>
   );
 }
 
 function BrokerSection({ brokers }) {
   return (
-    <Section title="Broker IPO Notes" subtitle="Recommendations are recorded only when explicitly available in public sources.">
+    <Section title="Broker / Analyst Watch" subtitle="Public calls and commentary are recorded only when explicitly available in sourced coverage.">
       <div className="mb-4 grid gap-2 md:grid-cols-4">
         <MiniMetric label="Subscribe" value={brokers.summary?.subscribe || 0} />
         <MiniMetric label="Neutral" value={brokers.summary?.neutral || 0} />
@@ -764,7 +852,7 @@ function Diagnostics({ sourceStatus }) {
         <MiniMetric label="Failed" value={sourceStatus.filter((s) => s.status === "Failed").length} />
       </div>
       <p className="mt-4 text-xs leading-relaxed text-[var(--text-dim)]">
-        Reliability levels: 1 official/regulatory, 2 reputed financial media, 3 broker/analyst, 4 IPO portal, 5 YouTube/social/forums.
+        Reliability levels: 1 official/regulatory, 2 reputed financial media/market data, 3 broker/analyst, 4 market or IPO portal, 5 YouTube/social/forums.
       </p>
     </Section>
   );

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildProvenanceStatus,
   classifyCategory,
   classifySector,
   classifySegment,
@@ -209,4 +210,51 @@ test("vehicle finance payments and insurance roll into Others segment", () => {
   assert.equal(classifySegment("Shriram Finance reports vehicle finance growth", "Earnings"), "Others");
   assert.equal(classifySegment("PhonePe payment aggregator update from RBI", "Regulation"), "Others");
   assert.equal(classifySegment("IRDAI issues insurance broker circular", "Regulation"), "Others");
+});
+
+test("provenance marks sample fallback content explicitly", () => {
+  const provenance = buildProvenanceStatus({
+    contentBasis: "sample_fallback",
+    sourceHealth: [
+      { source: "RBI", status: "error" },
+      { source: "Google News NBFC", status: "error" },
+    ],
+    sourceStats: {
+      totalSources: 2,
+      primarySources: 1,
+      directSources: 0,
+      aggregatorSources: 1,
+      directCoveragePct: 50,
+      aggregatorDependencyPct: 50,
+    },
+    qualityStats: { candidateItems: 0, materialItems: 0, filteredItems: 0 },
+  });
+
+  assert.equal(provenance.mode, "sample");
+  assert.equal(provenance.label, "Sample fallback");
+  assert.equal(provenance.counts.healthySources, 0);
+});
+
+test("provenance marks aggregator-heavy live coverage as partial", () => {
+  const provenance = buildProvenanceStatus({
+    contentBasis: "live_sources",
+    sourceHealth: [
+      { source: "RBI", status: "ok" },
+      { source: "Google News NBFC", status: "ok" },
+      { source: "BSE Filings", status: "skipped" },
+    ],
+    sourceStats: {
+      totalSources: 3,
+      primarySources: 1,
+      directSources: 0,
+      aggregatorSources: 2,
+      directCoveragePct: 33,
+      aggregatorDependencyPct: 67,
+    },
+    qualityStats: { candidateItems: 10, materialItems: 6, filteredItems: 4 },
+  });
+
+  assert.equal(provenance.mode, "partial");
+  assert.equal(provenance.counts.aggregatorDependencyPct, 67);
+  assert.equal(provenance.counts.materialItems, 6);
 });

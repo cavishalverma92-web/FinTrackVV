@@ -32,6 +32,7 @@ const INITIAL_DATA = {
   sources: null,
   sourceStats: null,
   qualityStats: null,
+  provenance: null,
   updatedAt: null,
   cache: null,
 };
@@ -41,7 +42,7 @@ const STALE_ON_LOAD_MS = 10 * 60 * 1000;
 const SECTION_STALE_MS = 10 * 60 * 1000;
 
 function inferDataStatus(data) {
-  return data?.cache?.refreshFailed || data?.error ? "fallback" : "ready";
+  return data?.cache?.refreshFailed || data?.cache?.fallback || data?.error || data?.provenance?.mode === "sample" ? "fallback" : "ready";
 }
 
 function isSnapshotStale(data, maxAgeMs = STALE_ON_LOAD_MS) {
@@ -217,7 +218,9 @@ export default function DashboardClient({ initialIntelligence }) {
                   sources={intelligence.sources}
                   updatedAt={intelligence.updatedAt}
                   cache={intelligence.cache}
+                  sourceStats={intelligence.sourceStats}
                   qualityStats={intelligence.qualityStats}
+                  provenance={intelligence.provenance}
                   searchQuery={searchQuery}
                   selectedId={selectedNews?.id}
                   onSelectNews={setSelectedNews}

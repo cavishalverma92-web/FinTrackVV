@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FILTER_OPTIONS } from "../../data/appConfig";
-import { Flame, Clock, ExternalLink, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Flame, RefreshCw } from "lucide-react";
 
 function Tag({ label, color = "var(--accent-blue)" }) {
   return (
@@ -206,13 +206,79 @@ function itemMatchesSegment(item, segment) {
   return (SEGMENT_KEYWORDS[segment] || []).some((keyword) => text.includes(keyword));
 }
 
+function provenanceStyle(tone) {
+  if (tone === "positive") {
+    return { color: "var(--accent-green)", bg: "rgba(18,107,79,0.08)", border: "rgba(18,107,79,0.24)" };
+  }
+  if (tone === "negative") {
+    return { color: "var(--accent-red)", bg: "rgba(168,50,50,0.08)", border: "rgba(168,50,50,0.24)" };
+  }
+  return { color: "var(--accent-amber)", bg: "rgba(183,121,31,0.08)", border: "rgba(183,121,31,0.24)" };
+}
+
+function ProvenanceBanner({ provenance, sourceStats, qualityStats, cache, dataStatus, dataError }) {
+  const counts = provenance?.counts || {};
+  const label = provenance?.label || (dataStatus === "fallback" ? "Fallback snapshot" : "Source status");
+  const tone = provenance?.tone || (dataStatus === "fallback" ? "warning" : "positive");
+  const style = provenanceStyle(tone);
+  const totalSources = counts.totalSources ?? sourceStats?.totalSources ?? 0;
+  const healthySources = counts.healthySources ?? 0;
+  const directCoveragePct = counts.directCoveragePct ?? sourceStats?.directCoveragePct;
+  const aggregatorDependencyPct = counts.aggregatorDependencyPct ?? sourceStats?.aggregatorDependencyPct;
+  const materialItems = counts.materialItems ?? qualityStats?.materialItems;
+  const candidateItems = counts.candidateItems ?? qualityStats?.candidateItems;
+  const Icon = tone === "positive" ? CheckCircle2 : AlertTriangle;
+  const servedFromCache = cache?.servedFromCache;
+
+  if (!provenance && !sourceStats && !qualityStats && dataStatus !== "fallback") return null;
+
+  return (
+    <div
+      className="mb-4 rounded-md border px-4 py-3"
+      style={{ color: style.color, backgroundColor: style.bg, borderColor: style.border }}
+    >
+      <div className="flex items-start gap-3">
+        <Icon size={15} className="mt-0.5 flex-shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest font-mono">
+              {label}
+            </span>
+            {servedFromCache && (
+              <span className="rounded-sm bg-[var(--bg-card)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--text-dim)] font-mono">
+                Cached
+              </span>
+            )}
+            {qualityStats?.sampleFallback && (
+              <span className="rounded-sm bg-[var(--bg-card)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--accent-amber)] font-mono">
+                Sample data
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
+            {provenance?.summary || (dataError ? `Live refresh unavailable: ${dataError}` : "Source and quality status for the current feed snapshot.")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-[var(--text-dim)]">
+            {totalSources > 0 && <span>Sources ok: {healthySources}/{totalSources}</span>}
+            {Number.isFinite(directCoveragePct) && <span>Direct + primary: {directCoveragePct}%</span>}
+            {Number.isFinite(aggregatorDependencyPct) && <span>Aggregators: {aggregatorDependencyPct}%</span>}
+            {Number.isFinite(candidateItems) && <span>Quality kept: {materialItems || 0}/{candidateItems}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function NewsFeed({
   newsItems = [],
   dataStatus = "ready",
   dataError,
   updatedAt,
   cache,
+  sourceStats,
   qualityStats,
+  provenance,
   searchQuery = "",
   selectedId,
   onSelectNews,
@@ -272,6 +338,15 @@ export default function NewsFeed({
           </p>
         )}
       </div>
+
+      <ProvenanceBanner
+        provenance={provenance}
+        sourceStats={sourceStats}
+        qualityStats={qualityStats}
+        cache={cache}
+        dataStatus={dataStatus}
+        dataError={dataError}
+      />
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {FILTER_OPTIONS.map((f) => (

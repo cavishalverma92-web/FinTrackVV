@@ -745,9 +745,155 @@ async function writeIntelligenceCache(payload) {
   return cachedPayload;
 }
 
+function countSourceStatuses(sourceHealth = []) {
+  return sourceHealth.reduce((acc, source) => {
+    const status = source.status || "unknown";
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+export function buildProvenanceStatus({
+  contentBasis = "live_sources",
+  sourceHealth = [],
+  sourceStats = null,
+  qualityStats = null,
+  cache = null,
+  error = null,
+} = {}) {
+  const statusCounts = countSourceStatuses(sourceHealth);
+  const healthySources = statusCounts.ok || 0;
+  const issueSources = (statusCounts.error || 0) + (statusCounts.fallback || 0);
+  const skippedSources = statusCounts.skipped || 0;
+  const totalSources = sourceStats?.totalSources ?? sourceHealth.length;
+  const directCoveragePct = sourceStats?.directCoveragePct ?? 0;
+  const aggregatorDependencyPct = sourceStats?.aggregatorDependencyPct ?? 0;
+  const usingSample = contentBasis === "sample_fallback";
+  const refreshFailed = Boolean(error || cache?.refreshFailed || cache?.fallback);
+  const allSourcesFailed = totalSources > 0 && healthySources === 0 && issueSources > 0;
+
+  let mode = "live";
+  let label = "Live source-backed";
+  let tone = "positive";
+  let summary = "Stories are backed by this refresh's source pipeline.";
+
+  if (usingSample) {
+    mode = "sample";
+    label = "Sample fallback";
+    tone = "warning";
+    summary = "No live material stories were available, so the feed is showing built-in sample intelligence.";
+  } else if (refreshFailed) {
+    mode = "fallback";
+    label = "Last snapshot";
+    tone = "warning";
+    summary = "Live refresh failed; content is coming from the last available snapshot.";
+  } else if (allSourcesFailed) {
+    mode = "offline";
+    label = "Sources unavailable";
+    tone = "negative";
+    summary = "Configured sources did not return usable live items in this refresh.";
+  } else if (issueSources > 0 || skippedSources > 0 || aggregatorDependencyPct >= 50) {
+    mode = "partial";
+    label = "Partial live coverage";
+    tone = "caution";
+    summary = "Feed has live inputs, but coverage is partial or aggregator-heavy.";
+  }
+
+  return {
+    mode,
+    label,
+    tone,
+    summary,
+    contentBasis,
+    updatedAt: new Date().toISOString(),
+    counts: {
+      totalSources,
+      healthySources,
+      issueSources,
+      skippedSources,
+      primarySources: sourceStats?.primarySources || 0,
+      directSources: sourceStats?.directSources || 0,
+      aggregatorSources: sourceStats?.aggregatorSources || 0,
+      directCoveragePct,
+      aggregatorDependencyPct,
+      candidateItems: qualityStats?.candidateItems || 0,
+      materialItems: qualityStats?.materialItems || 0,
+      filteredItems: qualityStats?.filteredItems || 0,
+    },
+  };
+}
+
+function collectSourceHealth(sources = {}) {
+  return [
+    ...(sources.rss || []),
+    ...(sources.html || []),
+    ...(sources.apis || []),
+  ];
+}
+
+function isSampleFallbackPayload(payload = {}) {
+  if (payload.qualityStats?.sampleFallback || payload.cache?.contentBasis === "sample_fallback") return true;
+  const sampleHeadlines = new Set(NEWS_ITEMS.map((item) => item.headline));
+  const items = payload.newsItems || [];
+  return items.length > 0 && items.every((item) => sampleHeadlines.has(item.headline));
+}
+
+function withProvenance(payload = {}, cacheOverrides = {}) {
+  const sourceHealth = payload.sourceHealth?.length ? payload.sourceHealth : collectSourceHealth(payload.sources);
+  const sourceStats = payload.sourceStats || buildSourceStats(sourceHealth);
+  const sampleFallback = isSampleFallbackPayload(payload);
+  const qualityStats = {
+    ...(payload.qualityStats || {}),
+    sampleFallback,
+  };
+  const cache = {
+    ...(payload.cache || {}),
+    ...cacheOverrides,
+    contentBasis: cacheOverrides.contentBasis || payload.cache?.contentBasis || (sampleFallback ? "sample_fallback" : "live_sources"),
+  };
+  const shouldRebuildProvenance = Boolean(cacheOverrides.refreshFailed || cacheOverrides.fallback);
+
+  return {
+    ...payload,
+    sourceHealth,
+    sourceStats,
+    qualityStats,
+    cache,
+    provenance: !shouldRebuildProvenance && payload.provenance ? payload.provenance : buildProvenanceStatus({
+      contentBasis: cache.contentBasis,
+      sourceHealth,
+      sourceStats,
+      qualityStats,
+      cache,
+      error: payload.error,
+    }),
+  };
+}
+
 async function fallbackPayload(error) {
   const fallbackNewsItems = withArticleSlugs(NEWS_ITEMS).map(applyTimeFields);
-  return {
+  const fallbackSources = {
+    rss: RSS_FEEDS.map((feed) => ({ ...feed, type: "RSS", status: "fallback", itemCount: 0, error: error.message })),
+    apis: [
+      ...NEWS_APIS,
+      { source: "Yahoo Finance", url: "https://query1.finance.yahoo.com/v7/finance/quote" },
+      { source: "Frankfurter FX", url: "https://api.frankfurter.app/latest" },
+    ].map((api) => ({ ...api, type: "API", status: "fallback", itemCount: 0, error: error.message })),
+  };
+  const sourceHealth = [...fallbackSources.rss, ...fallbackSources.apis];
+  const sourceStats = buildSourceStats(sourceHealth);
+  const qualityStats = {
+    candidateItems: fallbackNewsItems.length,
+    materialItems: fallbackNewsItems.length,
+    filteredItems: 0,
+    sampleFallback: true,
+  };
+  const cache = {
+    cached: false,
+    fallback: true,
+    error: error.message,
+  };
+  return withProvenance({
     newsItems: fallbackNewsItems,
     alerts: ALERTS,
     ratingChanges: RATING_CHANGES,
@@ -760,24 +906,22 @@ async function fallbackPayload(error) {
     materialUpdates: buildMaterialUpdates(fallbackNewsItems, PEER_DATA, RATING_CHANGES),
     watchlist: buildWatchlist(fallbackNewsItems, PEER_DATA, RATING_CHANGES),
     dailyBrief: await buildDailyBrief(fallbackNewsItems, RATING_CHANGES),
-    sources: {
-      rss: RSS_FEEDS.map((feed) => ({ ...feed, type: "RSS", status: "fallback", itemCount: 0, error: error.message })),
-      apis: [
-        ...NEWS_APIS,
-        { source: "Yahoo Finance", url: "https://query1.finance.yahoo.com/v7/finance/quote" },
-        { source: "Frankfurter FX", url: "https://api.frankfurter.app/latest" },
-      ].map((api) => ({ ...api, type: "API", status: "fallback", itemCount: 0, error: error.message })),
-    },
-    sourceHealth: [],
-    qualityStats: { candidateItems: fallbackNewsItems.length, materialItems: fallbackNewsItems.length, filteredItems: 0 },
+    sources: fallbackSources,
+    sourceHealth,
+    sourceStats,
+    qualityStats,
+    provenance: buildProvenanceStatus({
+      contentBasis: "sample_fallback",
+      sourceHealth,
+      sourceStats,
+      qualityStats,
+      cache,
+      error: error.message,
+    }),
     error: error.message,
     updatedAt: new Date().toISOString(),
-    cache: {
-      cached: false,
-      fallback: true,
-      error: error.message,
-    },
-  };
+    cache,
+  });
 }
 
 const FINANCE_SYMBOLS = [
@@ -2779,10 +2923,11 @@ async function buildIntelligencePayload() {
     // Persist merged set back to Redis (fire-and-forget)
     if (freshDeduped.length) saveNewsArchive(freshDeduped);
 
+    const usingSampleNews = dedupedNews.length === 0;
     const newsItems = withArticleSlugs(
-      dedupedNews.length
-        ? dedupedNews
-        : filterPortalItems(NEWS_ITEMS)
+      usingSampleNews
+        ? filterPortalItems(NEWS_ITEMS)
+        : dedupedNews
     ).map(applyTimeFields);
     const refreshedAt = new Date().toISOString();
     const apiHealth = [
@@ -2850,7 +2995,17 @@ async function buildIntelligencePayload() {
     const materialUpdates = buildMaterialUpdates(newsItems, market.peerData, resolvedRatings);
     const watchlist = buildWatchlist(newsItems, market.peerData, resolvedRatings);
     const dailyBrief = await buildDailyBrief(newsItems, resolvedRatings);
-    const sourceStats = buildSourceStats([...rssHealth, ...htmlHealth, ...apiHealth]);
+    const sourceHealth = [...rssHealth, ...htmlHealth, ...apiHealth];
+    const sourceStats = buildSourceStats(sourceHealth);
+    const finalQualityStats = {
+      ...qualityStats,
+      sampleFallback: usingSampleNews,
+    };
+    const cache = {
+      cached: false,
+      refreshedAt: new Date().toISOString(),
+      contentBasis: usingSampleNews ? "sample_fallback" : "live_sources",
+    };
 
     return {
       newsItems,
@@ -2870,14 +3025,18 @@ async function buildIntelligencePayload() {
         html: htmlHealth,
         apis: apiHealth,
       },
-      sourceHealth: [...rssHealth, ...htmlHealth, ...apiHealth],
+      sourceHealth,
       sourceStats,
-      qualityStats,
+      qualityStats: finalQualityStats,
+      provenance: buildProvenanceStatus({
+        contentBasis: usingSampleNews ? "sample_fallback" : "live_sources",
+        sourceHealth,
+        sourceStats,
+        qualityStats: finalQualityStats,
+        cache,
+      }),
       updatedAt: new Date().toISOString(),
-      cache: {
-        cached: false,
-        refreshedAt: new Date().toISOString(),
-      },
+      cache,
     };
 }
 
@@ -2885,13 +3044,7 @@ export async function getIntelligenceSnapshot({ forceRefresh = false, allowStale
   if (!forceRefresh) {
     const cached = await readIntelligenceCache({ ignoreTtl: allowStale });
     if (cached) {
-      return {
-        ...cached,
-        cache: {
-          ...(cached.cache || {}),
-          servedFromCache: true,
-        },
-      };
+      return withProvenance(cached, { servedFromCache: true });
     }
   }
 
@@ -2901,16 +3054,14 @@ export async function getIntelligenceSnapshot({ forceRefresh = false, allowStale
   } catch (error) {
     const cached = await readIntelligenceCache({ ignoreTtl: true });
     if (cached) {
-      return {
+      return withProvenance({
         ...cached,
         error: error.message,
-        cache: {
-          ...(cached.cache || {}),
-          servedFromCache: true,
-          refreshFailed: true,
-          refreshError: error.message,
-        },
-      };
+      }, {
+        servedFromCache: true,
+        refreshFailed: true,
+        refreshError: error.message,
+      });
     }
 
     return await fallbackPayload(error);

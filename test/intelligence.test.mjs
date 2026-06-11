@@ -258,3 +258,49 @@ test("provenance marks aggregator-heavy live coverage as partial", () => {
   assert.equal(provenance.counts.aggregatorDependencyPct, 67);
   assert.equal(provenance.counts.materialItems, 6);
 });
+
+test("discovery feed items remain aggregator-tier evidence", () => {
+  const ranked = dedupeAndRankNews([{
+    id: "gdelt-1",
+    headline: "Indian NBFC sector sees digital lending update",
+    tldr: "Discovered by GDELT from a publisher article.",
+    source: "Reuters",
+    sourceType: "discovery",
+    category: "Policy",
+    risk: "Low",
+    publishedAt: new Date().toISOString(),
+    tags: ["NBFC"],
+  }]);
+
+  assert.equal(ranked[0].sourceTier, "aggregator");
+});
+
+test("final ranking caps aggregator share when direct items are available", () => {
+  const now = new Date().toISOString();
+  const aggregators = Array.from({ length: 80 }, (_, index) => ({
+    id: `agg-${index}`,
+    headline: `NBFC digital lending aggregator update entityagg${index}`,
+    tldr: `Google News discovered lending policy item ${index}`,
+    source: `Google News Test ${index}`,
+    category: "Policy",
+    risk: "Low",
+    publishedAt: now,
+    tags: ["NBFC"],
+  }));
+  const direct = Array.from({ length: 60 }, (_, index) => ({
+    id: `direct-${index}`,
+    headline: `Direct publisher NBFC lending update entitydirect${index}`,
+    tldr: `Direct source reports financial services development ${index}`,
+    source: `Direct Publisher ${index}`,
+    category: "Policy",
+    risk: "Low",
+    publishedAt: now,
+    tags: ["NBFC"],
+  }));
+
+  const ranked = dedupeAndRankNews([...aggregators, ...direct]);
+  const aggregatorCount = ranked.filter((item) => item.sourceTier === "aggregator").length;
+
+  assert.equal(ranked.length, 60);
+  assert.ok(aggregatorCount <= 21);
+});

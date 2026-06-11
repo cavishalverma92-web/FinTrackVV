@@ -873,12 +873,12 @@ function withProvenance(payload = {}, cacheOverrides = {}) {
 async function fallbackPayload(error) {
   const fallbackNewsItems = withArticleSlugs(NEWS_ITEMS).map(applyTimeFields);
   const fallbackSources = {
-    rss: RSS_FEEDS.map((feed) => ({ ...feed, type: "RSS", status: "fallback", itemCount: 0, error: error.message })),
+    rss: RSS_FEEDS.map((feed) => ({ ...feed, type: "RSS", sourceTier: sourceTierFor(feed.source), status: "fallback", itemCount: 0, error: error.message })),
     apis: [
       ...NEWS_APIS,
       { source: "Yahoo Finance", url: "https://query1.finance.yahoo.com/v7/finance/quote" },
       { source: "Frankfurter FX", url: "https://api.frankfurter.app/latest" },
-    ].map((api) => ({ ...api, type: "API", status: "fallback", itemCount: 0, error: error.message })),
+    ].map((api) => ({ ...api, type: "API", sourceTier: sourceTierFor(api.source, api.source === "GDELT" ? "discovery" : ""), status: "fallback", itemCount: 0, error: error.message })),
   };
   const sourceHealth = [...fallbackSources.rss, ...fallbackSources.apis];
   const sourceStats = buildSourceStats(sourceHealth);
@@ -1158,6 +1158,13 @@ const CATEGORY_WEIGHTS = {
   "AI & Tech": 20,
   "Product / Tech": 20,
   "Market / Macro": 8,
+};
+
+const SOURCE_TIER_WEIGHTS = {
+  primary: 28,
+  direct: 10,
+  aggregator: -12,
+  unknown: 0,
 };
 
 function decodeEntities(value = "") {
@@ -1486,14 +1493,16 @@ function relevanceScore(item) {
   const publishedAt = publishedTime(item);
   const ageHours = publishedAt ? Math.max(0, (Date.now() - publishedAt) / 3600000) : 72;
   const recencyScore = Math.max(0, 80 - ageHours * 1.5);
+  const sourceTier = item.sourceTier || sourceTierFor(item.source, item.sourceType);
   const sourceScore = SOURCE_WEIGHTS[item.source] || 16;
+  const tierScore = SOURCE_TIER_WEIGHTS[sourceTier] || 0;
   const categoryScore = CATEGORY_WEIGHTS[item.category] || 10;
   const riskScore = item.risk === "High" ? 25 : item.risk === "Medium" ? 10 : 0;
   const linkScore = item.url ? 5 : 0;
   const sectorScore = item.sector && item.sector !== "Others" ? 18 : item.segment && item.segment !== "Others" ? 10 : -20;
-  const primaryScore = item.sourceType === "exchange_filing" || ["RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA"].includes(item.source) ? 12 : 0;
+  const primaryScore = sourceTier === "primary" ? 12 : 0;
 
-  return Math.round(recencyScore + sourceScore + categoryScore + riskScore + linkScore + sectorScore + primaryScore);
+  return Math.round(recencyScore + sourceScore + tierScore + categoryScore + riskScore + linkScore + sectorScore + primaryScore);
 }
 
 function buildWhyMatters(category, source) {
@@ -1640,7 +1649,7 @@ function toNewsItem(item, index) {
     url: item.link,
     publishedAt: item.publishedAt,
     publishedTs: publishedTime(item),
-    sourceTier: sourceTierFor(item.source),
+    sourceTier: sourceTierFor(item.source, item.sourceType),
     sourceType: item.sourceType || "news_feed",
     materialityReason: materialityReason({ category, sector, source: item.source, entities, sourceType: item.sourceType || "news_feed" }),
   };
@@ -1753,7 +1762,7 @@ function rebalanceSources(items, limit = 36) {
   const aggregator = [];
 
   items.forEach((item) => {
-    const tier = sourceTierFor(item.source);
+    const tier = sourceTierFor(item.source, item.sourceType);
     if (tier === "primary") primary.push(item);
     else if (tier === "direct") direct.push(item);
     else aggregator.push(item);
@@ -1983,6 +1992,7 @@ async function fetchGdeltNews() {
       link: article.url,
       publishedAt: article.seendate,
       source: article.sourceCommonName || "GDELT",
+      sourceType: "discovery",
       defaultCategory: "Policy",
     }, index))
     .filter((item) => !shouldExcludePortalItem(item));
@@ -2030,6 +2040,7 @@ export function dedupeAndRankNews(items) {
       const category = normalizeEventType(enrichedItem.category) || enrichedItem.category || classifyCategory(`${enrichedItem.headline} ${enrichedItem.tldr}`, enrichedItem.defaultCategory);
       const sector = enrichedItem.sector || classifySector(`${enrichedItem.headline} ${enrichedItem.tldr}`, category);
       const normalizedUrl = normalizeUrl(enrichedItem.url);
+      const sourceTier = enrichedItem.sourceTier || sourceTierFor(enrichedItem.source, enrichedItem.sourceType);
       const fingerprint = sha256([
         normalizeHeadline(enrichedItem.headline),
         normalizeHeadline(enrichedItem.tldr || ""),
@@ -2042,6 +2053,7 @@ export function dedupeAndRankNews(items) {
       return {
         ...enrichedItem,
         normalizedUrl,
+        sourceTier,
         contentFingerprint: fingerprint,
         category,
         eventType: enrichedItem.eventType || category,
@@ -2101,8 +2113,25 @@ export function dedupeAndRankNews(items) {
 
 function sourceCapFor(item) {
   if (["RBI", "SEBI", "BSE", "NSE"].includes(item.source)) return 8;
-  if (String(item.source || "").startsWith("Google News")) return 10;
+  if (sourceTierFor(item.source, item.sourceType) === "aggregator") return 5;
   return 12;
+}
+
+function sourceTierRank(item = {}) {
+  const tier = item.sourceTier || sourceTierFor(item.source, item.sourceType);
+  if (tier === "primary") return 3;
+  if (tier === "direct") return 2;
+  if (tier === "aggregator") return 1;
+  return 0;
+}
+
+function compareSourceQuality(a, b) {
+  const tierDelta = sourceTierRank(b) - sourceTierRank(a);
+  if (tierDelta) return tierDelta;
+  if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+  const aTs = a.publishedTs || a.ingestedTs || 0;
+  const bTs = b.publishedTs || b.ingestedTs || 0;
+  return bTs - aTs;
 }
 
 function sectionKeyForNews(item = {}) {
@@ -2119,6 +2148,7 @@ function diversifyRankedNews(items, limit = 60) {
   const overflow = [];
   const sourceCounts = new Map();
   const sectionCounts = new Map();
+  const tierCounts = new Map();
   const selectedIds = new Set();
   const prioritySections = [
     "Exchange Filings",
@@ -2139,25 +2169,33 @@ function diversifyRankedNews(items, limit = 60) {
     selected.push(item);
     selectedIds.add(item.id);
     sourceCounts.set(item.source || "Unknown", (sourceCounts.get(item.source || "Unknown") || 0) + 1);
+    const tier = item.sourceTier || sourceTierFor(item.source, item.sourceType);
+    tierCounts.set(tier, (tierCounts.get(tier) || 0) + 1);
     const section = sectionKeyForNews(item);
     sectionCounts.set(section, (sectionCounts.get(section) || 0) + 1);
     return true;
   };
 
   for (const section of prioritySections) {
-    const match = items.find((item) => sectionKeyForNews(item) === section && !selectedIds.has(item.id));
+    const match = items
+      .filter((item) => sectionKeyForNews(item) === section && !selectedIds.has(item.id))
+      .sort(compareSourceQuality)[0];
     if (match) add(match);
     if (selected.length >= Math.min(limit, prioritySections.length)) break;
   }
 
+  const aggregatorLimit = Math.max(8, Math.floor(limit * 0.35));
   for (const item of items) {
     if (selectedIds.has(item.id)) continue;
     const source = item.source || "Unknown";
     const section = sectionKeyForNews(item);
+    const tier = item.sourceTier || sourceTierFor(item.source, item.sourceType);
     const sourceCount = sourceCounts.get(source) || 0;
     const sectionCount = sectionCounts.get(section) || 0;
+    const tierCount = tierCounts.get(tier) || 0;
     const sectionCap = section === "Regulation" ? 12 : section === "Others" ? 10 : 14;
-    if (sourceCount < sourceCapFor(item) && sectionCount < sectionCap) {
+    const underTierCap = tier !== "aggregator" || tierCount < aggregatorLimit;
+    if (underTierCap && sourceCount < sourceCapFor(item) && sectionCount < sectionCap) {
       add(item);
     } else {
       overflow.push(item);
@@ -2821,7 +2859,9 @@ function buildPenaltyTracker(newsItems) {
     }));
 }
 
-function sourceTierFor(source) {
+function sourceTierFor(source, sourceType = "") {
+  if (sourceType === "exchange_filing") return "primary";
+  if (sourceType === "discovery" || sourceType === "aggregator") return "aggregator";
   if (["BSE", "NSE", "RBI", "SEBI", "IRDAI", "PFRDA", "IFSCA", "PIB"].includes(source)) return "primary";
   if (String(source || "").startsWith("Google News")) return "aggregator";
   return "direct";
@@ -2886,6 +2926,7 @@ async function buildIntelligencePayload() {
       : RSS_FEEDS.map((feed) => ({
           ...feed,
           type: "RSS",
+          sourceTier: sourceTierFor(feed.source),
           status: "error",
           itemCount: 0,
           error: rssNewsResult.reason?.message || "RSS refresh failed",
@@ -2956,6 +2997,7 @@ async function buildIntelligencePayload() {
       {
         ...NEWS_APIS[0],
         type: "API",
+        sourceTier: "aggregator",
         status: gdeltNewsResult.status === "fulfilled" ? "ok" : "error",
         itemCount: gdeltNewsResult.status === "fulfilled" ? gdeltNewsResult.value.length : 0,
         lastFetchedAt: refreshedAt,
